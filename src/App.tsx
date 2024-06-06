@@ -1,18 +1,26 @@
 import React, { useState } from 'react';
-import { Database, Settings, TrendingUp } from 'lucide-react';
-import { ThemeProvider } from './contexts/ThemeContext';
+import { Database, Settings, TrendingUp, Plus } from 'lucide-react';
+import { ThemeProvider, useTheme } from './contexts/ThemeContext';
 import { FileUploader } from './components/FileUploader';
 import { ThemeSelector } from './components/ThemeSelector';
 import { ChartControls } from './components/ChartControls';
 import { ChartRenderer } from './components/ChartRenderer';
 import { parseCSV, normalizeData } from './utils/csvParser';
 import { DataPoint, ColumnInfo, ChartConfig } from './types';
+import { ChartControlSingle } from './components/ChartControls';
+import { BarChartComponent } from './components/charts/BarChartComponent';
+import { LineChartComponent } from './components/charts/LineChartComponent';
+import { PieChartComponent } from './components/charts/PieChartComponent';
+import { ScatterChartComponent } from './components/charts/ScatterChartComponent';
+import { HeatmapComponent } from './components/charts/HeatmapComponent';
+import { FootprintComponent } from './components/charts/FootprintComponent';
 
 function AppContent() {
   const [data, setData] = useState<DataPoint[]>([]);
   const [columns, setColumns] = useState<ColumnInfo[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [configs, setConfigs] = useState<ChartConfig[]>([]);
+  const { theme } = useTheme ? useTheme() : { theme: 'light' };
 
   const handleFileUpload = async (file: File) => {
     setIsLoading(true);
@@ -49,6 +57,59 @@ function AppContent() {
   };
 
   const hasData = data.length > 0 && columns.length > 0;
+
+  const numericColumns = columns.filter(col => col.type === 'numeric');
+
+  // Helper to update a single config
+  const updateConfig = (id: string, updates: Partial<ChartConfig>) => {
+    setConfigs(configs => configs.map(config => config.id === id ? { ...config, ...updates } : config));
+  };
+  // Helper to remove a config
+  const removeConfig = (id: string) => {
+    if (configs.length > 1) {
+      setConfigs(configs => configs.filter(config => config.id !== id));
+    }
+  };
+  // Helper to add a new chart
+  const addNewChart = () => {
+    const firstCategorical = columns.find(col => col.type === 'categorical');
+    const firstNumeric = columns.find(col => col.type === 'numeric');
+    const newConfig: ChartConfig = {
+      id: `chart-${Date.now()}`,
+      xAxis: firstCategorical?.name || columns[0]?.name || '',
+      yAxis: firstNumeric?.name || columns[1]?.name || '',
+      chartType: 'bar',
+      normalized: false,
+      title: `Chart ${configs.length + 1}`
+    };
+    setConfigs([...configs, newConfig]);
+  };
+
+  // Chart rendering logic (from ChartRenderer)
+  const renderChart = (config: ChartConfig) => {
+    const commonProps = {
+      data,
+      xAxis: config.xAxis,
+      yAxis: Array.isArray(config.yAxis) ? config.yAxis[0] : config.yAxis,
+      normalized: config.normalized
+    };
+    switch (config.chartType) {
+      case 'bar':
+        return <BarChartComponent {...commonProps} />;
+      case 'line':
+        return <LineChartComponent {...commonProps} />;
+      case 'pie':
+        return <PieChartComponent {...commonProps} />;
+      case 'scatter':
+        return <ScatterChartComponent {...commonProps} />;
+      case 'heatmap':
+        return <HeatmapComponent {...commonProps} />;
+      case 'footprint':
+        return <FootprintComponent {...commonProps} />;
+      default:
+        return <BarChartComponent {...commonProps} />;
+    }
+  };
 
   return (
     <div className="min-h-screen transition-colors duration-300">
@@ -131,24 +192,40 @@ function AppContent() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                  <div className="lg:col-span-1">
-                    <ChartControls
-                      columns={columns}
-                      configs={configs}
-                      onConfigsChange={setConfigs}
-                    />
-                  </div>
-                  
-                  <div className="lg:col-span-2">
-                    {configs.length > 0 && configs.every(config => config.xAxis && config.yAxis) && (
-                      <ChartRenderer
-                        data={data}
-                        configs={configs}
-                        columns={columns}
-                      />
-                    )}
-                  </div>
+                <div className="flex justify-between items-center mb-6">
+                  <h2 className="text-xl font-semibold text-gray-900 dark:text-white flex items-center space-x-2">
+                    <Settings className="h-5 w-5" />
+                    <span>Charts</span>
+                  </h2>
+                  <button
+                    onClick={addNewChart}
+                    className="px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center space-x-2 bg-blue-600 text-white shadow-lg"
+                  >
+                    <Plus className="h-4 w-4" />
+                    <span>Add Chart</span>
+                  </button>
+                </div>
+                <div className="space-y-8">
+                  {configs.map((config, idx) => (
+                    <div key={config.id} className="flex flex-col md:flex-row gap-6 items-stretch">
+                      <div className="md:w-1/3">
+                        <ChartControlSingle
+                          config={config}
+                          columns={columns}
+                          numericColumns={numericColumns}
+                          onUpdate={(updates) => updateConfig(config.id, updates)}
+                          onRemove={() => removeConfig(config.id)}
+                          theme={theme}
+                          disableRemove={configs.length === 1}
+                        />
+                      </div>
+                      <div className="md:w-2/3 flex items-center">
+                        <div className="w-full">
+                          {renderChart(config)}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>

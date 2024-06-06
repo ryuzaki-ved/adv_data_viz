@@ -190,3 +190,139 @@ export const ChartControls: React.FC<ChartControlsProps> = ({ columns, configs, 
     </div>
   );
 };
+
+// Single chart control component
+export const ChartControlSingle: React.FC<{
+  config: ChartConfig;
+  columns: ColumnInfo[];
+  numericColumns: ColumnInfo[];
+  onUpdate: (updates: Partial<ChartConfig>) => void;
+  onRemove: () => void;
+  theme: string;
+  disableRemove?: boolean;
+}> = ({ config, columns, numericColumns, onUpdate, onRemove, theme, disableRemove }) => {
+  const chartTypes: { key: ChartType; icon: React.ReactNode; label: string }[] = [
+    { key: 'bar', icon: <BarChart3 className="h-4 w-4" />, label: 'Bar' },
+    { key: 'line', icon: <LineChart className="h-4 w-4" />, label: 'Line' },
+    { key: 'pie', icon: <PieChart className="h-4 w-4" />, label: 'Pie' },
+    { key: 'scatter', icon: <Scatter className="h-4 w-4" />, label: 'Scatter' },
+    { key: 'heatmap', icon: <Grid3x3 className="h-4 w-4" />, label: 'Heatmap' },
+    { key: 'footprint', icon: <Target className="h-4 w-4" />, label: 'Footprint' }
+  ];
+
+  const getThemeClasses = () => {
+    switch (theme) {
+      case 'dark':
+        return {
+          card: 'bg-gray-800 border-gray-700',
+          input: 'bg-gray-700 border-gray-600 text-white',
+          button: 'bg-gray-700 text-white hover:bg-gray-600',
+          activeButton: 'bg-blue-600 text-white shadow-lg',
+          deleteButton: 'bg-red-600 hover:bg-red-700 text-white'
+        };
+      case 'accent':
+        return {
+          card: 'bg-gradient-to-br from-purple-50 to-blue-50 border-purple-200',
+          input: 'bg-white border-purple-200 text-purple-900',
+          button: 'bg-white text-purple-700 hover:bg-purple-50 border border-purple-200',
+          activeButton: 'bg-gradient-to-r from-purple-500 to-blue-500 text-white shadow-lg',
+          deleteButton: 'bg-red-500 hover:bg-red-600 text-white'
+        };
+      default:
+        return {
+          card: 'bg-white border-gray-200',
+          input: 'bg-white border-gray-300 text-gray-900',
+          button: 'bg-gray-50 text-gray-700 hover:bg-gray-100',
+          activeButton: 'bg-blue-600 text-white shadow-lg',
+          deleteButton: 'bg-red-500 hover:bg-red-600 text-white'
+        };
+    }
+  };
+  const themeClasses = getThemeClasses();
+
+  return (
+    <div className={`p-4 rounded-xl border ${themeClasses.card} space-y-4`}>
+      <div className="flex items-center justify-between">
+        <input
+          type="text"
+          value={config.title || ''}
+          onChange={(e) => onUpdate({ title: e.target.value })}
+          placeholder={config.title || ''}
+          className={`text-sm font-medium bg-transparent border-none outline-none ${
+            theme === 'dark' ? 'text-white' : theme === 'accent' ? 'text-purple-900' : 'text-gray-900'
+          }`}
+        />
+        {!disableRemove && (
+          <button
+            onClick={onRemove}
+            className={`p-1 rounded ${themeClasses.deleteButton}`}
+          >
+            <X className="h-4 w-4" />
+          </button>
+        )}
+      </div>
+      {/* Chart Type Selection */}
+      <div>
+        <label className="block text-xs font-medium mb-2 opacity-70">Chart Type</label>
+        <div className="grid grid-cols-3 gap-1">
+          {chartTypes.map(({ key, icon, label }) => (
+            <button
+              key={key}
+              onClick={() => onUpdate({ chartType: key })}
+              className={`p-2 rounded text-xs font-medium transition-all duration-200 flex items-center justify-center space-x-1 ${
+                config.chartType === key ? themeClasses.activeButton : themeClasses.button
+              }`}
+            >
+              {icon}
+              <span className="hidden sm:inline">{label}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+      {/* Axis Configuration */}
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="block text-xs font-medium mb-1 opacity-70">X-Axis</label>
+          <select
+            value={config.xAxis}
+            onChange={(e) => onUpdate({ xAxis: e.target.value })}
+            className={`w-full p-2 rounded border text-xs ${themeClasses.input} focus:ring-1 focus:ring-blue-500 focus:border-blue-500`}
+          >
+            {columns.map(column => (
+              <option key={column.name} value={column.name}>
+                {column.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="block text-xs font-medium mb-1 opacity-70">Y-Axis</label>
+          <select
+            value={Array.isArray(config.yAxis) ? config.yAxis[0] : config.yAxis}
+            onChange={(e) => onUpdate({ yAxis: e.target.value })}
+            className={`w-full p-2 rounded border text-xs ${themeClasses.input} focus:ring-1 focus:ring-blue-500 focus:border-blue-500`}
+          >
+            {numericColumns.map(column => (
+              <option key={column.name} value={column.name}>
+                {column.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+      {/* Normalization Toggle */}
+      <div className="flex items-center space-x-2">
+        <input
+          type="checkbox"
+          id={`normalize-${config.id}`}
+          checked={config.normalized}
+          onChange={(e) => onUpdate({ normalized: e.target.checked })}
+          className="w-3 h-3 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
+        />
+        <label htmlFor={`normalize-${config.id}`} className="text-xs font-medium cursor-pointer opacity-70">
+          Normalize data
+        </label>
+      </div>
+    </div>
+  );
+};
