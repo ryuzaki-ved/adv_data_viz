@@ -35,9 +35,9 @@ export const HeatmapComponent: React.FC<HeatmapComponentProps> = ({ data, xAxis,
 
   const colorScale = scaleLinear<string>()
     .domain([minValue, maxValue])
-    .range(theme === 'dark' ? ['#1F2937', '#60A5FA'] : theme === 'accent' ? ['#FEF3C7', '#8B5CF6'] : ['#F3F4F6', '#3B82F6']);
+    .range(theme === 'dark' ? ['#1F2937', '#60A5FA'] : theme === 'accent' ? ['#FEF3C7', '#8B5CF6'] : ['#F9FAFB', '#3B82F6']);
 
-  const cellSize = Math.min(400 / Math.max(xValues.length, yValues.length), 40);
+  const cellSize = Math.min(300 / Math.max(xValues.length, yValues.length), 30);
 
   return (
     <div className="flex flex-col items-center space-y-4">
@@ -64,10 +64,10 @@ export const HeatmapComponent: React.FC<HeatmapComponentProps> = ({ data, xAxis,
         </svg>
       </div>
       
-      <div className="flex items-center space-x-4 text-sm">
+      <div className="flex items-center space-x-3 text-xs opacity-70">
         <span>Low</span>
         <div 
-          className="w-32 h-4 rounded-full"
+          className="w-24 h-3 rounded-full"
           style={{ 
             background: `linear-gradient(to right, ${colorScale(minValue)}, ${colorScale(maxValue)})`
           }}

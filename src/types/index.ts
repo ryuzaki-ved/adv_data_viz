@@ -3,10 +3,12 @@ export interface DataPoint {
 }
 
 export interface ChartConfig {
+  id: string;
   xAxis: string;
   yAxis: string | string[];
   chartType: ChartType;
   normalized: boolean;
+  title?: string;
 }
 
 export type ChartType = 'bar' | 'line' | 'pie' | 'scatter' | 'heatmap' | 'footprint';

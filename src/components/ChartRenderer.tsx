@@ -10,11 +10,11 @@ import { useTheme } from '../contexts/ThemeContext';
 
 interface ChartRendererProps {
   data: DataPoint[];
-  config: ChartConfig;
+  configs: ChartConfig[];
   columns: ColumnInfo[];
 }
 
-export const ChartRenderer: React.FC<ChartRendererProps> = ({ data, config, columns }) => {
+export const ChartRenderer: React.FC<ChartRendererProps> = ({ data, configs, columns }) => {
   const { theme } = useTheme();
 
   const getThemeClasses = () => {
@@ -28,7 +28,7 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data, config, colu
     }
   };
 
-  const renderChart = () => {
+  const renderChart = (config: ChartConfig) => {
     const commonProps = {
       data,
       xAxis: config.xAxis,
@@ -55,19 +55,23 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data, config, colu
   };
 
   return (
-    <div className={`p-6 rounded-xl border ${getThemeClasses()}`}>
-      <div className="flex justify-between items-center mb-6">
-        <h3 className="text-lg font-semibold capitalize">
-          {config.chartType.replace(/([A-Z])/g, ' $1')} Chart
-        </h3>
-        <div className="text-sm opacity-70">
-          {data.length} data points
+    <div className="space-y-6">
+      {configs.map((config) => (
+        <div key={config.id} className={`p-6 rounded-xl border ${getThemeClasses()}`}>
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-lg font-semibold">
+              {config.title || `${config.chartType.charAt(0).toUpperCase() + config.chartType.slice(1)} Chart`}
+            </h3>
+            <div className="text-sm opacity-60">
+              {config.xAxis} vs {Array.isArray(config.yAxis) ? config.yAxis[0] : config.yAxis}
+            </div>
+          </div>
+          
+          <div className="w-full">
+            {renderChart(config)}
+          </div>
         </div>
-      </div>
-      
-      <div className="w-full">
-        {renderChart()}
-      </div>
+      ))}
     </div>
   );
 };

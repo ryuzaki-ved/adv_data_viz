@@ -1,5 +1,5 @@
 import React from 'react';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { DataPoint } from '../../types';
 import { useTheme } from '../../contexts/ThemeContext';
 
@@ -33,24 +33,26 @@ export const PieChartComponent: React.FC<PieChartComponentProps> = ({ data, xAxi
   }));
 
   const colors = {
-    light: ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#06B6D4', '#84CC16', '#F97316'],
-    dark: ['#60A5FA', '#34D399', '#FBBF24', '#F87171', '#A78BFA', '#22D3EE', '#A3E635', '#FB923C'],
-    accent: ['#8B5CF6', '#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#06B6D4', '#84CC16', '#F97316']
+    light: ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#06B6D4'],
+    dark: ['#60A5FA', '#34D399', '#FBBF24', '#F87171', '#A78BFA', '#22D3EE'],
+    accent: ['#8B5CF6', '#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#06B6D4']
   };
 
   const themeColors = colors[theme];
 
   return (
-    <ResponsiveContainer width="100%" height={400}>
+    <ResponsiveContainer width="100%" height={350}>
       <PieChart>
         <Pie
           data={pieData}
           cx="50%"
           cy="50%"
-          outerRadius={120}
+          outerRadius={100}
           fill="#8884d8"
           dataKey="value"
           label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+          labelLine={false}
+          fontSize={11}
         >
           {pieData.map((entry, index) => (
             <Cell key={`cell-${index}`} fill={themeColors[index % themeColors.length]} />
@@ -59,12 +61,12 @@ export const PieChartComponent: React.FC<PieChartComponentProps> = ({ data, xAxi
         <Tooltip 
           contentStyle={{
             backgroundColor: theme === 'dark' ? '#1F2937' : '#FFFFFF',
-            border: `1px solid ${theme === 'dark' ? '#4B5563' : '#E5E7EB'}`,
+            border: 'none',
             borderRadius: '8px',
-            color: theme === 'dark' ? '#D1D5DB' : '#374151'
+            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+            fontSize: '12px'
           }}
         />
-        <Legend />
       </PieChart>
     </ResponsiveContainer>
   );

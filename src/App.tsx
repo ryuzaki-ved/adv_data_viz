@@ -12,12 +12,7 @@ function AppContent() {
   const [data, setData] = useState<DataPoint[]>([]);
   const [columns, setColumns] = useState<ColumnInfo[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [config, setConfig] = useState<ChartConfig>({
-    xAxis: '',
-    yAxis: '',
-    chartType: 'bar',
-    normalized: false
-  });
+  const [configs, setConfigs] = useState<ChartConfig[]>([]);
 
   const handleFileUpload = async (file: File) => {
     setIsLoading(true);
@@ -31,17 +26,19 @@ function AppContent() {
       setData(normalizedData);
       setColumns(parsedColumns);
       
-      // Auto-configure axes
+      // Auto-configure first chart
       const firstCategorical = parsedColumns.find(col => col.type === 'categorical');
       const firstNumeric = parsedColumns.find(col => col.type === 'numeric');
       
       if (firstCategorical && firstNumeric) {
-        setConfig({
+        setConfigs([{
+          id: 'chart-1',
           xAxis: firstCategorical.name,
           yAxis: firstNumeric.name,
           chartType: 'bar',
-          normalized: false
-        });
+          normalized: false,
+          title: 'Chart 1'
+        }]);
       }
     } catch (error) {
       console.error('Error parsing CSV:', error);
@@ -109,7 +106,7 @@ function AppContent() {
                     onClick={() => {
                       setData([]);
                       setColumns([]);
-                      setConfig({ xAxis: '', yAxis: '', chartType: 'bar', normalized: false });
+                      setConfigs([]);
                     }}
                     className="px-4 py-2 text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
                   >
@@ -134,20 +131,24 @@ function AppContent() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                  <ChartControls
-                    columns={columns}
-                    config={config}
-                    onConfigChange={setConfig}
-                  />
-                  
-                  {config.xAxis && config.yAxis && (
-                    <ChartRenderer
-                      data={data}
-                      config={config}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                  <div className="lg:col-span-1">
+                    <ChartControls
                       columns={columns}
+                      configs={configs}
+                      onConfigsChange={setConfigs}
                     />
-                  )}
+                  </div>
+                  
+                  <div className="lg:col-span-2">
+                    {configs.length > 0 && configs.every(config => config.xAxis && config.yAxis) && (
+                      <ChartRenderer
+                        data={data}
+                        configs={configs}
+                        columns={columns}
+                      />
+                    )}
+                  </div>
                 </div>
               </div>
             </div>

@@ -23,12 +23,12 @@ export const FootprintComponent: React.FC<FootprintComponentProps> = ({ data, xA
   const bubbles = data.map((item, index) => {
     const value = Number(item[yKey]);
     const normalizedSize = range > 0 ? (value - minValue) / range : 0.5;
-    const size = 20 + normalizedSize * 60; // Size between 20 and 80
+    const size = 15 + normalizedSize * 40; // Size between 15 and 55
     
     return {
       id: index,
-      x: 50 + (Math.random() - 0.5) * 300, // Random positioning
-      y: 50 + (Math.random() - 0.5) * 200,
+      x: 50 + (Math.random() - 0.5) * 250, // Random positioning
+      y: 50 + (Math.random() - 0.5) * 150,
       size,
       value,
       label: String(item[xAxis])
@@ -45,7 +45,7 @@ export const FootprintComponent: React.FC<FootprintComponentProps> = ({ data, xA
 
   return (
     <div className="flex flex-col items-center">
-      <svg width="500" height="400" className="border rounded-lg bg-opacity-5">
+      <svg width="400" height="300" className="border rounded-lg bg-opacity-5">
         {bubbles.map((bubble, index) => (
           <g key={bubble.id}>
             <circle
@@ -55,7 +55,7 @@ export const FootprintComponent: React.FC<FootprintComponentProps> = ({ data, xA
               fill={themeColors[index % themeColors.length]}
               opacity={0.7}
               stroke={themeColors[index % themeColors.length]}
-              strokeWidth={2}
+              strokeWidth={1}
             >
               <title>{`${bubble.label}: ${bubble.value.toFixed(2)}`}</title>
             </circle>
@@ -64,17 +64,17 @@ export const FootprintComponent: React.FC<FootprintComponentProps> = ({ data, xA
               y={bubble.y}
               textAnchor="middle"
               dy="0.3em"
-              fontSize="12"
+              fontSize="10"
               fill={theme === 'dark' ? '#D1D5DB' : '#374151'}
               fontWeight="500"
             >
-              {bubble.label.length > 8 ? `${bubble.label.substring(0, 8)}...` : bubble.label}
+              {bubble.label.length > 6 ? `${bubble.label.substring(0, 6)}...` : bubble.label}
             </text>
           </g>
         ))}
       </svg>
       
-      <div className="mt-4 text-sm text-center opacity-70">
+      <div className="mt-3 text-xs text-center opacity-60">
         Bubble size represents {normalized ? `${yAxis} (normalized)` : yAxis} values
       </div>
     </div>

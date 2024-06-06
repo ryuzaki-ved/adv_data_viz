@@ -1,5 +1,5 @@
 import React from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { DataPoint } from '../../types';
 import { useTheme } from '../../contexts/ThemeContext';
 
@@ -16,39 +16,45 @@ export const BarChartComponent: React.FC<BarChartComponentProps> = ({ data, xAxi
   const yKey = normalized ? `${yAxis}_normalized` : yAxis;
   
   const colors = {
-    light: { bar: '#3B82F6', grid: '#E5E7EB', text: '#374151' },
-    dark: { bar: '#60A5FA', grid: '#4B5563', text: '#D1D5DB' },
-    accent: { bar: '#8B5CF6', grid: '#C4B5FD', text: '#581C87' }
+    light: { bar: '#3B82F6', grid: '#F3F4F6', text: '#6B7280' },
+    dark: { bar: '#60A5FA', grid: '#374151', text: '#9CA3AF' },
+    accent: { bar: '#8B5CF6', grid: '#E5E7EB', text: '#6B7280' }
   };
 
   const themeColors = colors[theme];
 
   return (
-    <ResponsiveContainer width="100%" height={400}>
-      <BarChart data={data} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
-        <CartesianGrid strokeDasharray="3 3" stroke={themeColors.grid} />
+    <ResponsiveContainer width="100%" height={350}>
+      <BarChart data={data} margin={{ top: 10, right: 10, left: 10, bottom: 10 }}>
+        <CartesianGrid strokeDasharray="3 3" stroke={themeColors.grid} strokeWidth={0.5} />
         <XAxis 
           dataKey={xAxis} 
           stroke={themeColors.text}
-          fontSize={12}
+          fontSize={11}
+          tickLine={false}
+          axisLine={false}
         />
         <YAxis 
           stroke={themeColors.text}
-          fontSize={12}
+          fontSize={11}
+          tickLine={false}
+          axisLine={false}
         />
         <Tooltip 
           contentStyle={{
             backgroundColor: theme === 'dark' ? '#1F2937' : '#FFFFFF',
-            border: `1px solid ${themeColors.grid}`,
+            border: 'none',
             borderRadius: '8px',
-            color: themeColors.text
+            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+            color: themeColors.text,
+            fontSize: '12px'
           }}
+          cursor={{ fill: 'rgba(59, 130, 246, 0.1)' }}
         />
-        <Legend />
         <Bar 
           dataKey={yKey} 
           fill={themeColors.bar}
-          radius={[4, 4, 0, 0]}
+          radius={[2, 2, 0, 0]}
           name={normalized ? `${yAxis} (normalized)` : yAxis}
         />
       </BarChart>
