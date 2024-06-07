@@ -6,60 +6,70 @@ import { useTheme } from '../../contexts/ThemeContext';
 interface LineChartComponentProps {
   data: DataPoint[];
   xAxis: string;
-  yAxis: string;
+  yAxis: string | string[];
   normalized?: boolean;
 }
 
 export const LineChartComponent: React.FC<LineChartComponentProps> = ({ data, xAxis, yAxis, normalized }) => {
   const { theme } = useTheme();
-  
-  const yKey = normalized ? `${yAxis}_normalized` : yAxis;
-  
-  const colors = {
-    light: { line: '#10B981', grid: '#F3F4F6', text: '#6B7280' },
-    dark: { line: '#34D399', grid: '#374151', text: '#9CA3AF' },
-    accent: { line: '#F59E0B', grid: '#E5E7EB', text: '#6B7280' }
+  const yKeys = Array.isArray(yAxis) ? yAxis : [yAxis];
+  const colorList = {
+    light: ['#10B981', '#3B82F6', '#F59E0B'],
+    dark: ['#34D399', '#60A5FA', '#FBBF24'],
+    accent: ['#F59E0B', '#8B5CF6', '#3B82F6']
   };
-
-  const themeColors = colors[theme];
+  const themeColors = colorList[theme];
 
   return (
-    <ResponsiveContainer width="100%" height={350}>
-      <LineChart data={data} margin={{ top: 10, right: 10, left: 10, bottom: 10 }}>
-        <CartesianGrid strokeDasharray="3 3" stroke={themeColors.grid} strokeWidth={0.5} />
-        <XAxis 
-          dataKey={xAxis} 
-          stroke={themeColors.text}
-          fontSize={11}
-          tickLine={false}
-          axisLine={false}
-        />
-        <YAxis 
-          stroke={themeColors.text}
-          fontSize={11}
-          tickLine={false}
-          axisLine={false}
-        />
-        <Tooltip 
-          contentStyle={{
-            backgroundColor: theme === 'dark' ? '#1F2937' : '#FFFFFF',
-            border: 'none',
-            borderRadius: '8px',
-            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-            color: themeColors.text,
-            fontSize: '12px'
-          }}
-        />
-        <Line 
-          type="monotone" 
-          dataKey={yKey} 
-          stroke={themeColors.line}
-          strokeWidth={2}
-          dot={{ fill: themeColors.line, strokeWidth: 0, r: 3 }}
-          activeDot={{ r: 4, stroke: themeColors.line, strokeWidth: 2, fill: '#ffffff' }}
-          name={normalized ? `${yAxis} (normalized)` : yAxis}
-        />
-      </LineChart>
-    </ResponsiveContainer>
+    <div>
+      <ResponsiveContainer width="100%" height={350}>
+        <LineChart data={data} margin={{ top: 10, right: 10, left: 10, bottom: 10 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke={themeColors[0]} strokeWidth={0.5} />
+          <XAxis 
+            dataKey={xAxis} 
+            stroke={themeColors[0]}
+            fontSize={11}
+            tickLine={false}
+            axisLine={false}
+          />
+          <YAxis 
+            stroke={themeColors[0]}
+            fontSize={11}
+            tickLine={false}
+            axisLine={false}
+          />
+          <Tooltip 
+            contentStyle={{
+              backgroundColor: theme === 'dark' ? '#1F2937' : '#FFFFFF',
+              border: 'none',
+              borderRadius: '8px',
+              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+              color: themeColors[0],
+              fontSize: '12px'
+            }}
+          />
+          {yKeys.map((y, idx) => (
+            <Line 
+              key={y}
+              type="monotone"
+              dataKey={normalized ? `${y}_normalized` : y}
+              stroke={themeColors[idx % themeColors.length]}
+              strokeWidth={2}
+              dot={{ fill: themeColors[idx % themeColors.length], strokeWidth: 0, r: 3 }}
+              activeDot={{ r: 4, stroke: themeColors[idx % themeColors.length], strokeWidth: 2, fill: '#ffffff' }}
+              name={normalized ? `${y} (normalized)` : y}
+            />
+          ))}
+        </LineChart>
+      </ResponsiveContainer>
+      <div className="flex space-x-4 mt-2 text-xs justify-center">
+        {yKeys.map((y, idx) => (
+          <div key={y} className="flex items-center space-x-1">
+            <span style={{ background: themeColors[idx % themeColors.length], width: 12, height: 12, display: 'inline-block', borderRadius: 2 }}></span>
+            <span>{normalized ? `${y} (normalized)` : y}</span>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 };

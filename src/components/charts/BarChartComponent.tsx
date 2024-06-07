@@ -6,58 +6,68 @@ import { useTheme } from '../../contexts/ThemeContext';
 interface BarChartComponentProps {
   data: DataPoint[];
   xAxis: string;
-  yAxis: string;
+  yAxis: string | string[];
   normalized?: boolean;
 }
 
 export const BarChartComponent: React.FC<BarChartComponentProps> = ({ data, xAxis, yAxis, normalized }) => {
   const { theme } = useTheme();
-  
-  const yKey = normalized ? `${yAxis}_normalized` : yAxis;
-  
-  const colors = {
-    light: { bar: '#3B82F6', grid: '#F3F4F6', text: '#6B7280' },
-    dark: { bar: '#60A5FA', grid: '#374151', text: '#9CA3AF' },
-    accent: { bar: '#8B5CF6', grid: '#E5E7EB', text: '#6B7280' }
+  const yKeys = Array.isArray(yAxis) ? yAxis : [yAxis];
+  const colorList = {
+    light: ['#3B82F6', '#10B981', '#F59E0B'],
+    dark: ['#60A5FA', '#34D399', '#FBBF24'],
+    accent: ['#8B5CF6', '#3B82F6', '#10B981']
   };
-
-  const themeColors = colors[theme];
+  const themeColors = colorList[theme];
 
   return (
-    <ResponsiveContainer width="100%" height={350}>
-      <BarChart data={data} margin={{ top: 10, right: 10, left: 10, bottom: 10 }}>
-        <CartesianGrid strokeDasharray="3 3" stroke={themeColors.grid} strokeWidth={0.5} />
-        <XAxis 
-          dataKey={xAxis} 
-          stroke={themeColors.text}
-          fontSize={11}
-          tickLine={false}
-          axisLine={false}
-        />
-        <YAxis 
-          stroke={themeColors.text}
-          fontSize={11}
-          tickLine={false}
-          axisLine={false}
-        />
-        <Tooltip 
-          contentStyle={{
-            backgroundColor: theme === 'dark' ? '#1F2937' : '#FFFFFF',
-            border: 'none',
-            borderRadius: '8px',
-            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-            color: themeColors.text,
-            fontSize: '12px'
-          }}
-          cursor={{ fill: 'rgba(59, 130, 246, 0.1)' }}
-        />
-        <Bar 
-          dataKey={yKey} 
-          fill={themeColors.bar}
-          radius={[2, 2, 0, 0]}
-          name={normalized ? `${yAxis} (normalized)` : yAxis}
-        />
-      </BarChart>
-    </ResponsiveContainer>
+    <div>
+      <ResponsiveContainer width="100%" height={350}>
+        <BarChart data={data} margin={{ top: 10, right: 10, left: 10, bottom: 10 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke={themeColors[0]} strokeWidth={0.5} />
+          <XAxis 
+            dataKey={xAxis} 
+            stroke={themeColors[0]}
+            fontSize={11}
+            tickLine={false}
+            axisLine={false}
+          />
+          <YAxis 
+            stroke={themeColors[0]}
+            fontSize={11}
+            tickLine={false}
+            axisLine={false}
+          />
+          <Tooltip 
+            contentStyle={{
+              backgroundColor: theme === 'dark' ? '#1F2937' : '#FFFFFF',
+              border: 'none',
+              borderRadius: '8px',
+              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+              color: themeColors[0],
+              fontSize: '12px'
+            }}
+            cursor={{ fill: 'rgba(59, 130, 246, 0.1)' }}
+          />
+          {yKeys.map((y, idx) => (
+            <Bar 
+              key={y}
+              dataKey={normalized ? `${y}_normalized` : y} 
+              fill={themeColors[idx % themeColors.length]}
+              radius={[2, 2, 0, 0]}
+              name={normalized ? `${y} (normalized)` : y}
+            />
+          ))}
+        </BarChart>
+      </ResponsiveContainer>
+      <div className="flex space-x-4 mt-2 text-xs justify-center">
+        {yKeys.map((y, idx) => (
+          <div key={y} className="flex items-center space-x-1">
+            <span style={{ background: themeColors[idx % themeColors.length], width: 12, height: 12, display: 'inline-block', borderRadius: 2 }}></span>
+            <span>{normalized ? `${y} (normalized)` : y}</span>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 };

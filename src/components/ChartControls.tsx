@@ -240,6 +240,22 @@ export const ChartControlSingle: React.FC<{
   };
   const themeClasses = getThemeClasses();
 
+  // Helper to determine if multi-Y is supported
+  const supportsMultiY = ['bar', 'line', 'scatter'].includes(config.chartType);
+  const yAxisArray = Array.isArray(config.yAxis) ? config.yAxis : [config.yAxis];
+  const maxY = 3;
+  const handleYCheckbox = (colName: string) => {
+    let newY: string[];
+    if (yAxisArray.includes(colName)) {
+      newY = yAxisArray.filter(y => y !== colName);
+    } else {
+      if (yAxisArray.length >= maxY) return; // Prevent more than maxY
+      newY = [...yAxisArray, colName];
+    }
+    // If only one selected, store as string for compatibility
+    onUpdate({ yAxis: newY.length === 1 ? newY[0] : newY });
+  };
+
   return (
     <div className={`p-4 rounded-xl border ${themeClasses.card} space-y-4`}>
       <div className="flex items-center justify-between">
@@ -296,18 +312,37 @@ export const ChartControlSingle: React.FC<{
           </select>
         </div>
         <div>
-          <label className="block text-xs font-medium mb-1 opacity-70">Y-Axis</label>
-          <select
-            value={Array.isArray(config.yAxis) ? config.yAxis[0] : config.yAxis}
-            onChange={(e) => onUpdate({ yAxis: e.target.value })}
-            className={`w-full p-2 rounded border text-xs ${themeClasses.input} focus:ring-1 focus:ring-blue-500 focus:border-blue-500`}
-          >
-            {numericColumns.map(column => (
-              <option key={column.name} value={column.name}>
-                {column.name}
-              </option>
-            ))}
-          </select>
+          <label className="block text-xs font-medium mb-1 opacity-70">Y-Axis{supportsMultiY ? ' (up to 3)' : ''}</label>
+          {supportsMultiY ? (
+            <div className="flex flex-col space-y-1 max-h-32 overflow-y-auto">
+              {numericColumns.map(column => (
+                <label key={column.name} className="flex items-center space-x-2 text-xs">
+                  <input
+                    type="checkbox"
+                    checked={yAxisArray.includes(column.name)}
+                    onChange={() => handleYCheckbox(column.name)}
+                    disabled={!yAxisArray.includes(column.name) && yAxisArray.length >= maxY}
+                  />
+                  <span>{column.name}</span>
+                </label>
+              ))}
+              {yAxisArray.length >= maxY && (
+                <span className="text-red-500 text-xs mt-1">Max {maxY} columns</span>
+              )}
+            </div>
+          ) : (
+            <select
+              value={Array.isArray(config.yAxis) ? config.yAxis[0] : config.yAxis}
+              onChange={(e) => onUpdate({ yAxis: e.target.value })}
+              className={`w-full p-2 rounded border text-xs ${themeClasses.input} focus:ring-1 focus:ring-blue-500 focus:border-blue-500`}
+            >
+              {numericColumns.map(column => (
+                <option key={column.name} value={column.name}>
+                  {column.name}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
       </div>
       {/* Normalization Toggle */}

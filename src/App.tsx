@@ -90,7 +90,7 @@ function AppContent() {
     const commonProps = {
       data,
       xAxis: config.xAxis,
-      yAxis: Array.isArray(config.yAxis) ? config.yAxis[0] : config.yAxis,
+      yAxis: config.yAxis,
       normalized: config.normalized
     };
     switch (config.chartType) {
