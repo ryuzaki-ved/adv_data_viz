@@ -9,9 +9,13 @@ interface FootprintComponentProps {
   normalized?: boolean;
   width?: number | string;
   height?: number;
+  xMin?: number;
+  xMax?: number;
+  yMin?: number;
+  yMax?: number;
 }
 
-export const FootprintComponent: React.FC<FootprintComponentProps> = ({ data, xAxis, yAxis, normalized, width = 400, height = 300 }) => {
+export const FootprintComponent: React.FC<FootprintComponentProps> = ({ data, xAxis, yAxis, normalized, width = 400, height = 300, xMin, xMax, yMin, yMax }) => {
   const { theme } = useTheme();
   const yKeys = Array.isArray(yAxis) ? yAxis : [yAxis];
   const colors = {
@@ -27,8 +31,8 @@ export const FootprintComponent: React.FC<FootprintComponentProps> = ({ data, xA
         const yKey = normalized ? `${y}_normalized` : y;
         // Calculate bubble sizes based on values
         const values = data.map(d => Number(d[yKey])).filter(v => !isNaN(v));
-        const minValue = Math.min(...values);
-        const maxValue = Math.max(...values);
+        const minValue = yMin !== undefined ? yMin : Math.min(...values);
+        const maxValue = yMax !== undefined ? yMax : Math.max(...values);
         const range = maxValue - minValue;
         const bubbles = data.map((item, index) => {
           const value = Number(item[yKey]);

@@ -266,11 +266,16 @@ export const ChartControlSingle: React.FC<{
     onUpdate({ width: 0, height: autoHeight });
   };
 
-  // Axis min/max controls
-  const xMin = config.xMin ?? '';
-  const xMax = config.xMax ?? '';
-  const yMin = config.yMin ?? '';
-  const yMax = config.yMax ?? '';
+  // Axis min/max controls as sliders
+  const xMin = config.xMin;
+  const xMax = config.xMax;
+  const yMin = config.yMin;
+  const yMax = config.yMax;
+  // For slider ranges, use data min/max or sensible defaults
+  const xDataMin = config.xDataMin ?? 0;
+  const xDataMax = config.xDataMax ?? 100;
+  const yDataMin = config.yDataMin ?? 0;
+  const yDataMax = config.yDataMax ?? 100;
   const handleResetAxes = () => {
     onUpdate({ xMin: undefined, xMax: undefined, yMin: undefined, yMax: undefined });
   };
@@ -390,24 +395,6 @@ export const ChartControlSingle: React.FC<{
             className="w-32"
           />
           <span className="text-xs w-10 text-right">{width === 0 ? 'Auto' : `${width}px`}</span>
-          <span className="ml-2 text-xs">Min</span>
-          <input
-            type="number"
-            min={100}
-            max={maxW-1}
-            value={minW}
-            onChange={e => onUpdate({ minW: Number(e.target.value) })}
-            className="w-12 px-1 py-0.5 border rounded text-xs"
-          />
-          <span className="text-xs">Max</span>
-          <input
-            type="number"
-            min={minW+1}
-            max={2000}
-            value={maxW}
-            onChange={e => onUpdate({ maxW: Number(e.target.value) })}
-            className="w-12 px-1 py-0.5 border rounded text-xs"
-          />
         </div>
         <div className="flex items-center gap-2">
           <label className="text-xs font-medium opacity-70">Height</label>
@@ -420,24 +407,6 @@ export const ChartControlSingle: React.FC<{
             className="w-32"
           />
           <span className="text-xs w-10 text-right">{height}px</span>
-          <span className="ml-2 text-xs">Min</span>
-          <input
-            type="number"
-            min={100}
-            max={maxH-1}
-            value={minH}
-            onChange={e => onUpdate({ minH: Number(e.target.value) })}
-            className="w-12 px-1 py-0.5 border rounded text-xs"
-          />
-          <span className="text-xs">Max</span>
-          <input
-            type="number"
-            min={minH+1}
-            max={2000}
-            value={maxH}
-            onChange={e => onUpdate({ maxH: Number(e.target.value) })}
-            className="w-12 px-1 py-0.5 border rounded text-xs"
-          />
         </div>
         <button
           type="button"
@@ -447,44 +416,56 @@ export const ChartControlSingle: React.FC<{
           Auto-Fit Chart
         </button>
       </div>
-      {/* Axis Min/Max Controls */}
+      {/* Axis Min/Max Controls as Sliders */}
       {config.chartType !== 'pie' && (
         <div className="flex flex-col gap-2 mt-2">
           <div className="flex items-center gap-2">
             <label className="text-xs font-medium opacity-70">X-Axis Min</label>
             <input
-              type="number"
-              value={xMin}
-              onChange={e => onUpdate({ xMin: e.target.value === '' ? undefined : Number(e.target.value) })}
-              className="w-20 px-1 py-0.5 border rounded text-xs"
-              placeholder="Auto"
+              type="range"
+              min={xDataMin}
+              max={xDataMax}
+              value={xMin === undefined ? xDataMin : xMin}
+              onChange={e => onUpdate({ xMin: Number(e.target.value) })}
+              className="w-32"
+              disabled={xMax !== undefined && xMin !== undefined && xMin >= xMax}
             />
+            <span className="text-xs w-12 text-right">{xMin === undefined ? 'Auto' : xMin}</span>
             <label className="text-xs font-medium opacity-70">Max</label>
             <input
-              type="number"
-              value={xMax}
-              onChange={e => onUpdate({ xMax: e.target.value === '' ? undefined : Number(e.target.value) })}
-              className="w-20 px-1 py-0.5 border rounded text-xs"
-              placeholder="Auto"
+              type="range"
+              min={xDataMin}
+              max={xDataMax}
+              value={xMax === undefined ? xDataMax : xMax}
+              onChange={e => onUpdate({ xMax: Number(e.target.value) })}
+              className="w-32"
+              disabled={xMin !== undefined && xMax !== undefined && xMax <= xMin}
             />
+            <span className="text-xs w-12 text-right">{xMax === undefined ? 'Auto' : xMax}</span>
           </div>
           <div className="flex items-center gap-2">
             <label className="text-xs font-medium opacity-70">Y-Axis Min</label>
             <input
-              type="number"
-              value={yMin}
-              onChange={e => onUpdate({ yMin: e.target.value === '' ? undefined : Number(e.target.value) })}
-              className="w-20 px-1 py-0.5 border rounded text-xs"
-              placeholder="Auto"
+              type="range"
+              min={yDataMin}
+              max={yDataMax}
+              value={yMin === undefined ? yDataMin : yMin}
+              onChange={e => onUpdate({ yMin: Number(e.target.value) })}
+              className="w-32"
+              disabled={yMax !== undefined && yMin !== undefined && yMin >= yMax}
             />
+            <span className="text-xs w-12 text-right">{yMin === undefined ? 'Auto' : yMin}</span>
             <label className="text-xs font-medium opacity-70">Max</label>
             <input
-              type="number"
-              value={yMax}
-              onChange={e => onUpdate({ yMax: e.target.value === '' ? undefined : Number(e.target.value) })}
-              className="w-20 px-1 py-0.5 border rounded text-xs"
-              placeholder="Auto"
+              type="range"
+              min={yDataMin}
+              max={yDataMax}
+              value={yMax === undefined ? yDataMax : yMax}
+              onChange={e => onUpdate({ yMax: Number(e.target.value) })}
+              className="w-32"
+              disabled={yMin !== undefined && yMax !== undefined && yMax <= yMin}
             />
+            <span className="text-xs w-12 text-right">{yMax === undefined ? 'Auto' : yMax}</span>
             <button
               type="button"
               onClick={handleResetAxes}

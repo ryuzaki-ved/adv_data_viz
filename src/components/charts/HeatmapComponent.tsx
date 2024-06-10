@@ -10,9 +10,13 @@ interface HeatmapComponentProps {
   normalized?: boolean;
   width?: number | string;
   height?: number;
+  xMin?: number;
+  xMax?: number;
+  yMin?: number;
+  yMax?: number;
 }
 
-export const HeatmapComponent: React.FC<HeatmapComponentProps> = ({ data, xAxis, yAxis, normalized, width = 300, height = 300 }) => {
+export const HeatmapComponent: React.FC<HeatmapComponentProps> = ({ data, xAxis, yAxis, normalized, width = 300, height = 300, xMin, xMax, yMin, yMax }) => {
   const { theme } = useTheme();
   const yKeys = Array.isArray(yAxis) ? yAxis : [yAxis];
 
@@ -32,8 +36,8 @@ export const HeatmapComponent: React.FC<HeatmapComponentProps> = ({ data, xAxis,
           });
         });
         const values = matrix.map(d => d.value);
-        const minValue = Math.min(...values);
-        const maxValue = Math.max(...values);
+        const minValue = yMin !== undefined ? yMin : Math.min(...values);
+        const maxValue = yMax !== undefined ? yMax : Math.max(...values);
         const colorScale = scaleLinear<string>()
           .domain([minValue, maxValue])
           .range(theme === 'dark' ? ['#1F2937', '#60A5FA'] : theme === 'accent' ? ['#FEF3C7', '#8B5CF6'] : ['#F9FAFB', '#3B82F6']);
