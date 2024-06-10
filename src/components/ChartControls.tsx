@@ -106,7 +106,7 @@ export const ChartControls: React.FC<ChartControlsProps> = ({ columns, configs, 
                 onChange={(e) => updateConfig(config.id, { title: e.target.value })}
                 placeholder={`Chart ${index + 1}`}
                 className={`text-sm font-medium bg-transparent border-none outline-none ${
-                  theme === 'dark' ? 'text-white' : theme === 'accent' ? 'text-purple-900' : 'text-gray-900'
+                  theme === 'dark' ? 'text-white' : theme === 'accent' ? 'text-purple-900' : 'text-gray-900 dark:text-white'
                 }`}
               />
               {configs.length > 1 && (
@@ -256,6 +256,25 @@ export const ChartControlSingle: React.FC<{
     onUpdate({ yAxis: newY.length === 1 ? newY[0] : newY });
   };
 
+  // Defaults and min/max from config or fallback
+  const minW = config.minW ?? 200, maxW = config.maxW ?? 1000, minH = config.minH ?? 200, maxH = config.maxH ?? 700;
+  const width = config.width ?? 0; // 0 means 100%
+  const height = config.height ?? 350;
+  // Auto-fit logic: set width to 100%, height to 50 + N*10 (clamped)
+  const handleAutoFit = () => {
+    const autoHeight = Math.max(minH, Math.min(maxH, 50 + (config.dataLength ?? 30) * 10));
+    onUpdate({ width: 0, height: autoHeight });
+  };
+
+  // Axis min/max controls
+  const xMin = config.xMin ?? '';
+  const xMax = config.xMax ?? '';
+  const yMin = config.yMin ?? '';
+  const yMax = config.yMax ?? '';
+  const handleResetAxes = () => {
+    onUpdate({ xMin: undefined, xMax: undefined, yMin: undefined, yMax: undefined });
+  };
+
   return (
     <div className={`p-4 rounded-xl border ${themeClasses.card} space-y-4`}>
       <div className="flex items-center justify-between">
@@ -265,7 +284,7 @@ export const ChartControlSingle: React.FC<{
           onChange={(e) => onUpdate({ title: e.target.value })}
           placeholder={config.title || ''}
           className={`text-sm font-medium bg-transparent border-none outline-none ${
-            theme === 'dark' ? 'text-white' : theme === 'accent' ? 'text-purple-900' : 'text-gray-900'
+            theme === 'dark' ? 'text-white' : theme === 'accent' ? 'text-purple-900' : 'text-gray-900 dark:text-white'
           }`}
         />
         {!disableRemove && (
@@ -358,6 +377,124 @@ export const ChartControlSingle: React.FC<{
           Normalize data
         </label>
       </div>
+      {/* Chart Size Controls */}
+      <div className="flex flex-col gap-2 mt-2">
+        <div className="flex items-center gap-2">
+          <label className="text-xs font-medium opacity-70">Width</label>
+          <input
+            type="range"
+            min={minW}
+            max={maxW}
+            value={width === 0 ? maxW : width}
+            onChange={e => onUpdate({ width: Number(e.target.value) })}
+            className="w-32"
+          />
+          <span className="text-xs w-10 text-right">{width === 0 ? 'Auto' : `${width}px`}</span>
+          <span className="ml-2 text-xs">Min</span>
+          <input
+            type="number"
+            min={100}
+            max={maxW-1}
+            value={minW}
+            onChange={e => onUpdate({ minW: Number(e.target.value) })}
+            className="w-12 px-1 py-0.5 border rounded text-xs"
+          />
+          <span className="text-xs">Max</span>
+          <input
+            type="number"
+            min={minW+1}
+            max={2000}
+            value={maxW}
+            onChange={e => onUpdate({ maxW: Number(e.target.value) })}
+            className="w-12 px-1 py-0.5 border rounded text-xs"
+          />
+        </div>
+        <div className="flex items-center gap-2">
+          <label className="text-xs font-medium opacity-70">Height</label>
+          <input
+            type="range"
+            min={minH}
+            max={maxH}
+            value={height}
+            onChange={e => onUpdate({ height: Number(e.target.value) })}
+            className="w-32"
+          />
+          <span className="text-xs w-10 text-right">{height}px</span>
+          <span className="ml-2 text-xs">Min</span>
+          <input
+            type="number"
+            min={100}
+            max={maxH-1}
+            value={minH}
+            onChange={e => onUpdate({ minH: Number(e.target.value) })}
+            className="w-12 px-1 py-0.5 border rounded text-xs"
+          />
+          <span className="text-xs">Max</span>
+          <input
+            type="number"
+            min={minH+1}
+            max={2000}
+            value={maxH}
+            onChange={e => onUpdate({ maxH: Number(e.target.value) })}
+            className="w-12 px-1 py-0.5 border rounded text-xs"
+          />
+        </div>
+        <button
+          type="button"
+          onClick={handleAutoFit}
+          className="mt-1 px-3 py-1 rounded bg-blue-500 text-white text-xs hover:bg-blue-600 transition"
+        >
+          Auto-Fit Chart
+        </button>
+      </div>
+      {/* Axis Min/Max Controls */}
+      {config.chartType !== 'pie' && (
+        <div className="flex flex-col gap-2 mt-2">
+          <div className="flex items-center gap-2">
+            <label className="text-xs font-medium opacity-70">X-Axis Min</label>
+            <input
+              type="number"
+              value={xMin}
+              onChange={e => onUpdate({ xMin: e.target.value === '' ? undefined : Number(e.target.value) })}
+              className="w-20 px-1 py-0.5 border rounded text-xs"
+              placeholder="Auto"
+            />
+            <label className="text-xs font-medium opacity-70">Max</label>
+            <input
+              type="number"
+              value={xMax}
+              onChange={e => onUpdate({ xMax: e.target.value === '' ? undefined : Number(e.target.value) })}
+              className="w-20 px-1 py-0.5 border rounded text-xs"
+              placeholder="Auto"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <label className="text-xs font-medium opacity-70">Y-Axis Min</label>
+            <input
+              type="number"
+              value={yMin}
+              onChange={e => onUpdate({ yMin: e.target.value === '' ? undefined : Number(e.target.value) })}
+              className="w-20 px-1 py-0.5 border rounded text-xs"
+              placeholder="Auto"
+            />
+            <label className="text-xs font-medium opacity-70">Max</label>
+            <input
+              type="number"
+              value={yMax}
+              onChange={e => onUpdate({ yMax: e.target.value === '' ? undefined : Number(e.target.value) })}
+              className="w-20 px-1 py-0.5 border rounded text-xs"
+              placeholder="Auto"
+            />
+            <button
+              type="button"
+              onClick={handleResetAxes}
+              className="ml-2 px-2 py-1 rounded bg-gray-300 dark:bg-gray-700 text-xs text-gray-800 dark:text-white hover:bg-gray-400 dark:hover:bg-gray-600 transition"
+            >
+              Reset Axes
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

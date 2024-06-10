@@ -87,11 +87,19 @@ function AppContent() {
 
   // Chart rendering logic (from ChartRenderer)
   const renderChart = (config: ChartConfig) => {
+    const width = config.width === undefined ? '100%' : (config.width === 0 ? '100%' : config.width);
+    const height = config.height === undefined ? 350 : config.height;
     const commonProps = {
       data,
       xAxis: config.xAxis,
       yAxis: config.yAxis,
-      normalized: config.normalized
+      normalized: config.normalized,
+      width,
+      height,
+      xMin: config.xMin,
+      xMax: config.xMax,
+      yMin: config.yMin,
+      yMax: config.yMax
     };
     switch (config.chartType) {
       case 'bar':
