@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Database, Settings, TrendingUp, Plus } from 'lucide-react';
+import { Database, Settings, TrendingUp, Plus, Maximize2, X } from 'lucide-react';
 import { ThemeProvider, useTheme } from './contexts/ThemeContext';
 import { FileUploader } from './components/FileUploader';
 import { ThemeSelector } from './components/ThemeSelector';
@@ -20,6 +20,7 @@ function AppContent() {
   const [columns, setColumns] = useState<ColumnInfo[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [configs, setConfigs] = useState<ChartConfig[]>([]);
+  const [fullscreenChart, setFullscreenChart] = useState<string | null>(null);
   const { theme } = useTheme ? useTheme() : { theme: 'light' };
 
   const handleFileUpload = async (file: File) => {
@@ -86,9 +87,9 @@ function AppContent() {
   };
 
   // Chart rendering logic (from ChartRenderer)
-  const renderChart = (config: ChartConfig) => {
-    const width = config.width === undefined ? '100%' : (config.width === 0 ? '100%' : config.width);
-    const height = config.height === undefined ? 350 : config.height;
+  const renderChart = (config: ChartConfig, isFullscreen = false) => {
+    const width = isFullscreen ? '100%' : (config.width === undefined ? '100%' : (config.width === 0 ? '100%' : config.width));
+    const height = isFullscreen ? 600 : (config.height === undefined ? 350 : config.height);
     const commonProps = {
       data,
       xAxis: config.xAxis,
@@ -118,6 +119,28 @@ function AppContent() {
         return <BarChartComponent {...commonProps} />;
     }
   };
+
+  // Fullscreen modal component
+  const FullscreenModal = ({ config }: { config: ChartConfig }) => (
+    <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
+      <div className="bg-white dark:bg-gray-800 rounded-xl w-full h-full max-w-7xl max-h-full overflow-auto">
+        <div className="flex justify-between items-center p-6 border-b border-gray-200 dark:border-gray-700">
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+            {config.title || `Chart ${configs.findIndex(c => c.id === config.id) + 1}`}
+          </h2>
+          <button
+            onClick={() => setFullscreenChart(null)}
+            className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+          >
+            <X className="h-6 w-6" />
+          </button>
+        </div>
+        <div className="p-6">
+          {renderChart(config, true)}
+        </div>
+      </div>
+    </div>
+  );
 
   return (
     <div className="min-h-screen transition-colors duration-300">
@@ -237,8 +260,17 @@ function AppContent() {
                           <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
                             {config.title || `Chart ${idx + 1}`}
                           </h3>
-                          <div className="text-sm text-gray-600 dark:text-gray-400">
-                            {config.xAxis} vs {Array.isArray(config.yAxis) ? config.yAxis.join(', ') : config.yAxis}
+                          <div className="flex items-center space-x-3">
+                            <div className="text-sm text-gray-600 dark:text-gray-400">
+                              {config.xAxis} vs {Array.isArray(config.yAxis) ? config.yAxis.join(', ') : config.yAxis}
+                            </div>
+                            <button
+                              onClick={() => setFullscreenChart(config.id)}
+                              className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                              title="View in fullscreen"
+                            >
+                              <Maximize2 className="h-4 w-4" />
+                            </button>
                           </div>
                         </div>
                         <div className="w-full">
@@ -252,6 +284,11 @@ function AppContent() {
             </div>
           )}
         </main>
+
+        {/* Fullscreen Modal */}
+        {fullscreenChart && (
+          <FullscreenModal config={configs.find(c => c.id === fullscreenChart)!} />
+        )}
       </div>
     </div>
   );

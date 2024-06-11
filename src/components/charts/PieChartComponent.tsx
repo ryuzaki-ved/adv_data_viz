@@ -64,7 +64,13 @@ export const PieChartComponent: React.FC<PieChartComponentProps> = ({ data, xAxi
                       borderRadius: '8px',
                       boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
                       fontSize: '12px',
-                      color: theme === 'dark' ? '#fff' : '#111'
+                      color: theme === 'dark' ? '#FFFFFF' : '#111827'
+                    }}
+                    labelStyle={{
+                      color: theme === 'dark' ? '#FFFFFF' : '#111827'
+                    }}
+                    itemStyle={{
+                      color: theme === 'dark' ? '#FFFFFF' : '#111827'
                     }}
                   />
                 </PieChart>
