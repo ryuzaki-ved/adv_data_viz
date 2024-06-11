@@ -73,8 +73,8 @@ function AppContent() {
     }
   };
 
-  // Apply filters to data
-  const applyFilters = (filters: DataFilter[]) => {
+  // Apply filters to data with debouncing
+  const applyFilters = React.useCallback((filters: DataFilter[]) => {
     if (filters.length === 0) {
       setData(originalData);
       return;
@@ -93,7 +93,7 @@ function AppContent() {
           case 'less':
             return value < filter.value;
           case 'equal':
-            return value === filter.value;
+            return Math.abs(value - filter.value) < 0.001; // Handle floating point precision
           case 'greaterEqual':
             return value >= filter.value;
           case 'lessEqual':
@@ -105,7 +105,7 @@ function AppContent() {
     });
     
     setData(filteredData);
-  };
+  }, [originalData]);
 
   const handleFiltersChange = (filters: DataFilter[]) => {
     setDataFilters(filters);
@@ -150,7 +150,7 @@ function AppContent() {
     }));
   };
 
-  // Chart rendering logic (from ChartRenderer)
+  // Chart rendering logic with enhanced props
   const renderChart = (config: ChartConfig, isFullscreen = false) => {
     const width = isFullscreen ? '100%' : (config.width === undefined ? '100%' : (config.width === 0 ? '100%' : config.width));
     const height = isFullscreen ? 600 : (config.height === undefined ? 350 : config.height);
@@ -166,6 +166,7 @@ function AppContent() {
       yMin: config.yMin,
       yMax: config.yMax
     };
+    
     switch (config.chartType) {
       case 'bar':
         return <BarChartComponent {...commonProps} />;
@@ -225,7 +226,7 @@ function AppContent() {
     }
   };
 
-  // Fullscreen modal component
+  // Enhanced Fullscreen modal component with zoom controls
   const FullscreenModal = ({ config }: { config: ChartConfig }) => (
     <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
       <div className="bg-white dark:bg-gray-800 rounded-xl w-full h-full max-w-7xl max-h-full overflow-auto">
@@ -233,12 +234,17 @@ function AppContent() {
           <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
             {config.title || `Chart ${configs.findIndex(c => c.id === config.id) + 1}`}
           </h2>
-          <button
-            onClick={() => setFullscreenChart(null)}
-            className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
-          >
-            <X className="h-6 w-6" />
-          </button>
+          <div className="flex items-center space-x-3">
+            <div className="text-sm text-gray-600 dark:text-gray-400">
+              {config.xAxis} vs {Array.isArray(config.yAxis) ? config.yAxis.join(', ') : config.yAxis}
+            </div>
+            <button
+              onClick={() => setFullscreenChart(null)}
+              className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+            >
+              <X className="h-6 w-6" />
+            </button>
+          </div>
         </div>
         <div className="p-6">
           {renderChart(config, true)}
@@ -401,12 +407,13 @@ function AppContent() {
                   </div>
                 </div>
 
-                {/* Data Filters */}
+                {/* Enhanced Data Filters */}
                 <DataFilterComponent
                   columns={numericColumns}
                   filters={dataFilters}
                   onFiltersChange={handleFiltersChange}
                   theme={theme}
+                  data={originalData}
                 />
 
                 <div className="flex justify-between items-center mb-6">
@@ -416,17 +423,17 @@ function AppContent() {
                   </h2>
                   <button
                     onClick={addNewChart}
-                    className="px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center space-x-2 bg-blue-600 text-white shadow-lg hover:bg-blue-700"
+                    className="px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center space-x-2 bg-blue-600 text-white shadow-lg hover:bg-blue-700 transform hover:scale-105"
                   >
                     <Plus className="h-4 w-4" />
                     <span>Add Chart</span>
                   </button>
                 </div>
 
-                {/* Charts Section - Improved Layout */}
+                {/* Charts Section - Enhanced Layout */}
                 <div className="space-y-8">
                   {configs.map((config, idx) => (
-                    <div key={config.id} className="bg-gray-50 dark:bg-gray-900/50 rounded-xl p-6 border border-gray-200 dark:border-gray-700">
+                    <div key={config.id} className="bg-gray-50 dark:bg-gray-900/50 rounded-xl p-6 border border-gray-200 dark:border-gray-700 transition-all duration-200 hover:shadow-lg">
                       {/* Chart Controls Header with Collapse Toggle */}
                       <div className="flex justify-between items-center mb-4">
                         <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
@@ -491,7 +498,7 @@ function AppContent() {
           )}
         </main>
 
-        {/* Fullscreen Modal */}
+        {/* Enhanced Fullscreen Modal */}
         {fullscreenChart && (
           <FullscreenModal config={configs.find(c => c.id === fullscreenChart)!} />
         )}

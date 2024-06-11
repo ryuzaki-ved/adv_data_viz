@@ -1,5 +1,6 @@
-import React from 'react';
-import { ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import React, { useState, useRef } from 'react';
+import { ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Brush, ReferenceLine } from 'recharts';
+import { ZoomIn, ZoomOut, RotateCcw, Move } from 'lucide-react';
 import { DataPoint } from '../../types';
 import { useTheme } from '../../contexts/ThemeContext';
 
@@ -16,8 +17,14 @@ interface ScatterChartComponentProps {
   yMax?: number;
 }
 
-export const ScatterChartComponent: React.FC<ScatterChartComponentProps> = ({ data, xAxis, yAxis, normalized, width = '100%', height = 350, xMin, xMax, yMin, yMax }) => {
+export const ScatterChartComponent: React.FC<ScatterChartComponentProps> = ({ 
+  data, xAxis, yAxis, normalized, width = '100%', height = 350, xMin, xMax, yMin, yMax 
+}) => {
   const { theme } = useTheme();
+  const [zoomDomain, setZoomDomain] = useState<{ x?: [number, number]; y?: [number, number] }>({});
+  const [showBrush, setShowBrush] = useState(data.length > 100);
+  const chartRef = useRef<any>(null);
+  
   const yKeys = Array.isArray(yAxis) ? yAxis.slice(0, 3) : [yAxis];
   const colorList = {
     light: ['#EF4444', '#3B82F6', '#10B981'],
@@ -27,13 +34,77 @@ export const ScatterChartComponent: React.FC<ScatterChartComponentProps> = ({ da
   const themeColors = colorList[theme];
   const showRightAxis = yKeys.length > 1;
 
+  // Optimize data for large datasets with intelligent sampling
+  const optimizedData = React.useMemo(() => {
+    if (data.length <= 2000) return data;
+    
+    // Use stratified sampling to preserve data distribution
+    const sampleSize = 2000;
+    const step = Math.ceil(data.length / sampleSize);
+    const sampled = [];
+    
+    // Sort data by x-axis for better distribution
+    const sortedData = [...data].sort((a, b) => {
+      const aVal = Number(a[xAxis]);
+      const bVal = Number(b[xAxis]);
+      return aVal - bVal;
+    });
+    
+    for (let i = 0; i < sortedData.length; i += step) {
+      sampled.push(sortedData[i]);
+    }
+    
+    return sampled;
+  }, [data, xAxis]);
+
   // For each yKey, create scatter data
   const scatterDataArr = yKeys.map(y =>
-    data.map(item => ({
+    optimizedData.map(item => ({
       x: Number(item[xAxis]),
-      y: Number(normalized ? item[`${y}_normalized`] : item[y])
+      y: Number(normalized ? item[`${y}_normalized`] : item[y]),
+      originalData: item
     })).filter(item => !isNaN(item.x) && !isNaN(item.y))
   );
+
+  const handleZoomIn = () => {
+    const allXValues = scatterDataArr.flat().map(d => d.x);
+    const allYValues = scatterDataArr.flat().map(d => d.y);
+    
+    const currentXDomain = zoomDomain.x || [Math.min(...allXValues), Math.max(...allXValues)];
+    const currentYDomain = zoomDomain.y || [Math.min(...allYValues), Math.max(...allYValues)];
+    
+    const xCenter = (currentXDomain[0] + currentXDomain[1]) / 2;
+    const yCenter = (currentYDomain[0] + currentYDomain[1]) / 2;
+    const xRange = (currentXDomain[1] - currentXDomain[0]) * 0.5;
+    const yRange = (currentYDomain[1] - currentYDomain[0]) * 0.5;
+    
+    setZoomDomain({
+      x: [xCenter - xRange / 2, xCenter + xRange / 2],
+      y: [yCenter - yRange / 2, yCenter + yRange / 2]
+    });
+  };
+
+  const handleZoomOut = () => {
+    const allXValues = scatterDataArr.flat().map(d => d.x);
+    const allYValues = scatterDataArr.flat().map(d => d.y);
+    
+    const currentXDomain = zoomDomain.x || [Math.min(...allXValues), Math.max(...allXValues)];
+    const currentYDomain = zoomDomain.y || [Math.min(...allYValues), Math.max(...allYValues)];
+    
+    const xCenter = (currentXDomain[0] + currentXDomain[1]) / 2;
+    const yCenter = (currentYDomain[0] + currentYDomain[1]) / 2;
+    const xRange = Math.min((currentXDomain[1] - currentXDomain[0]) * 2, Math.max(...allXValues) - Math.min(...allXValues));
+    const yRange = Math.min((currentYDomain[1] - currentYDomain[0]) * 2, Math.max(...allYValues) - Math.min(...allYValues));
+    
+    setZoomDomain({
+      x: [xCenter - xRange / 2, xCenter + xRange / 2],
+      y: [yCenter - yRange / 2, yCenter + yRange / 2]
+    });
+  };
+
+  const handleResetZoom = () => {
+    setZoomDomain({});
+  };
 
   // Custom shape for third series
   const Triangle = (props: any) => {
@@ -43,8 +114,55 @@ export const ScatterChartComponent: React.FC<ScatterChartComponentProps> = ({ da
     );
   };
 
+  // Custom tooltip for better performance
+  const CustomTooltip = ({ active, payload, label }: any) => {
+    if (active && payload && payload.length) {
+      const data = payload[0].payload;
+      return (
+        <div className={`p-3 rounded-lg shadow-lg border ${
+          theme === 'dark' 
+            ? 'bg-gray-800 border-gray-700 text-white' 
+            : 'bg-white border-gray-200 text-gray-900'
+        }`}>
+          <p className="font-medium mb-1">{`${xAxis}: ${data.x?.toFixed(2)}`}</p>
+          {payload.map((entry: any, index: number) => (
+            <p key={index} style={{ color: entry.color }} className="text-sm">
+              {`${entry.name}: ${entry.value?.toFixed(2)}`}
+            </p>
+          ))}
+        </div>
+      );
+    }
+    return null;
+  };
+
   return (
-    <div>
+    <div className="relative">
+      {/* Chart Controls */}
+      <div className="absolute top-2 right-2 z-10 flex items-center space-x-1 bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm rounded-lg p-1 shadow-sm">
+        <button
+          onClick={handleZoomIn}
+          className="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+          title="Zoom In"
+        >
+          <ZoomIn className="h-4 w-4 text-gray-600 dark:text-gray-400" />
+        </button>
+        <button
+          onClick={handleZoomOut}
+          className="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+          title="Zoom Out"
+        >
+          <ZoomOut className="h-4 w-4 text-gray-600 dark:text-gray-400" />
+        </button>
+        <button
+          onClick={handleResetZoom}
+          className="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+          title="Reset Zoom"
+        >
+          <RotateCcw className="h-4 w-4 text-gray-600 dark:text-gray-400" />
+        </button>
+      </div>
+
       <ResponsiveContainer width={width} height={height}>
         <ScatterChart margin={{ top: 10, right: 40, left: 10, bottom: 10 }}>
           <CartesianGrid strokeDasharray="3 3" stroke={themeColors[0]} strokeWidth={0.5} />
@@ -56,7 +174,7 @@ export const ScatterChartComponent: React.FC<ScatterChartComponentProps> = ({ da
             fontSize={11}
             tickLine={false}
             axisLine={false}
-            domain={xMin !== undefined || xMax !== undefined ? [xMin ?? 'auto', xMax ?? 'auto'] : undefined}
+            domain={zoomDomain.x || (xMin !== undefined || xMax !== undefined ? [xMin ?? 'dataMin', xMax ?? 'dataMax'] : ['dataMin', 'dataMax'])}
           />
           <YAxis 
             yAxisId="left"
@@ -67,7 +185,7 @@ export const ScatterChartComponent: React.FC<ScatterChartComponentProps> = ({ da
             tickLine={false}
             axisLine={false}
             label={yKeys[0] ? { value: yKeys[0], angle: -90, position: 'insideLeft', fill: themeColors[0], fontSize: 12 } : undefined}
-            domain={yMin !== undefined || yMax !== undefined ? [yMin ?? 'auto', yMax ?? 'auto'] : undefined}
+            domain={zoomDomain.y || (yMin !== undefined || yMax !== undefined ? [yMin ?? 'dataMin', yMax ?? 'dataMax'] : ['dataMin', 'dataMax'])}
           />
           {showRightAxis && (
             <YAxis 
@@ -80,21 +198,11 @@ export const ScatterChartComponent: React.FC<ScatterChartComponentProps> = ({ da
               tickLine={false}
               axisLine={false}
               label={yKeys[1] ? { value: yKeys[1], angle: 90, position: 'insideRight', fill: themeColors[1], fontSize: 12 } : undefined}
-              domain={yMin !== undefined || yMax !== undefined ? [yMin ?? 'auto', yMax ?? 'auto'] : undefined}
+              domain={zoomDomain.y || (yMin !== undefined || yMax !== undefined ? [yMin ?? 'dataMin', yMax ?? 'dataMax'] : ['dataMin', 'dataMax'])}
             />
           )}
-          <Tooltip 
-            cursor={{ strokeDasharray: '3 3' }}
-            contentStyle={{
-              backgroundColor: theme === 'dark' ? '#1F2937' : '#FFFFFF',
-              border: 'none',
-              borderRadius: '8px',
-              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-              color: themeColors[0],
-              fontSize: '12px'
-            }}
-            formatter={(value, name, props) => [value, name === 'x' ? xAxis : (normalized ? `${props.payload.name} (normalized)` : props.payload.name)]}
-          />
+          <Tooltip content={<CustomTooltip />} cursor={{ strokeDasharray: '3 3' }} />
+          
           {/* First scatter on left axis */}
           {yKeys[0] && (
             <Scatter 
@@ -131,6 +239,7 @@ export const ScatterChartComponent: React.FC<ScatterChartComponentProps> = ({ da
           )}
         </ScatterChart>
       </ResponsiveContainer>
+      
       <div className="flex space-x-4 mt-2 text-xs justify-center">
         {yKeys.map((y, idx) => (
           <div key={y} className="flex items-center space-x-1">
@@ -138,6 +247,11 @@ export const ScatterChartComponent: React.FC<ScatterChartComponentProps> = ({ da
             <span className="text-gray-900 dark:text-white">{normalized ? `${y} (normalized)` : y}</span>
           </div>
         ))}
+        {optimizedData.length < data.length && (
+          <div className="text-xs text-gray-500 dark:text-gray-400 ml-4">
+            Showing {optimizedData.length} of {data.length} points
+          </div>
+        )}
       </div>
     </div>
   );

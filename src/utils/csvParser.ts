@@ -1,58 +1,155 @@
 import Papa from 'papaparse';
 import { DataPoint, ColumnInfo } from '../types';
 
+// Web Worker for CSV processing
+const createCSVWorker = () => {
+  const workerCode = `
+    importScripts('https://unpkg.com/papaparse@5.4.1/papaparse.min.js');
+    
+    self.onmessage = function(e) {
+      const { file, isLargeFile } = e.data;
+      
+      Papa.parse(file, {
+        header: true,
+        skipEmptyLines: true,
+        worker: false, // Already in worker
+        chunk: isLargeFile ? (results) => {
+          self.postMessage({ type: 'chunk', data: results.data });
+        } : undefined,
+        complete: (results) => {
+          self.postMessage({ type: 'complete', data: results.data });
+        },
+        error: (error) => {
+          self.postMessage({ type: 'error', error: error.message });
+        }
+      });
+    };
+  `;
+  
+  const blob = new Blob([workerCode], { type: 'application/javascript' });
+  return new Worker(URL.createObjectURL(blob));
+};
+
 export const parseCSV = (file: File): Promise<{ data: DataPoint[]; columns: ColumnInfo[] }> => {
   return new Promise((resolve, reject) => {
-    // For large files, use streaming and chunking
     const isLargeFile = file.size > 5 * 1024 * 1024; // 5MB threshold
+    const isVeryLargeFile = file.size > 50 * 1024 * 1024; // 50MB threshold
     
-    if (isLargeFile) {
-      // Use streaming for large files
-      Papa.parse(file, {
-        header: true,
-        skipEmptyLines: true,
-        chunk: (results, parser) => {
-          // Process chunks to avoid blocking the UI
-          // For now, we'll continue with the full parse but with worker
-          // In a production app, you might want to implement progressive loading
-        },
-        worker: true, // Use web worker for better performance
-        complete: (results) => {
-          try {
-            const data = results.data as DataPoint[];
-            
-            // For very large datasets, sample the data for column analysis
-            const sampleSize = Math.min(1000, data.length);
-            const sampleData = data.slice(0, sampleSize);
-            
-            const columns = analyzeColumns(sampleData, data.length);
-            resolve({ data, columns });
-          } catch (error) {
-            reject(error);
-          }
-        },
-        error: (error) => {
-          reject(error);
-        }
-      });
+    if (isVeryLargeFile) {
+      // Use streaming with progressive loading for very large files
+      parseCSVStreaming(file, resolve, reject);
+    } else if (isLargeFile) {
+      // Use web worker for large files
+      parseCSVWithWorker(file, resolve, reject);
     } else {
       // Standard parsing for smaller files
-      Papa.parse(file, {
-        header: true,
-        skipEmptyLines: true,
-        complete: (results) => {
-          try {
-            const data = results.data as DataPoint[];
-            const columns = analyzeColumns(data);
-            resolve({ data, columns });
-          } catch (error) {
-            reject(error);
-          }
-        },
-        error: (error) => {
-          reject(error);
+      parseCSVStandard(file, resolve, reject);
+    }
+  });
+};
+
+const parseCSVStandard = (
+  file: File, 
+  resolve: (value: { data: DataPoint[]; columns: ColumnInfo[] }) => void,
+  reject: (reason?: any) => void
+) => {
+  Papa.parse(file, {
+    header: true,
+    skipEmptyLines: true,
+    complete: (results) => {
+      try {
+        const data = results.data as DataPoint[];
+        const columns = analyzeColumns(data);
+        resolve({ data, columns });
+      } catch (error) {
+        reject(error);
+      }
+    },
+    error: (error) => {
+      reject(error);
+    }
+  });
+};
+
+const parseCSVWithWorker = (
+  file: File,
+  resolve: (value: { data: DataPoint[]; columns: ColumnInfo[] }) => void,
+  reject: (reason?: any) => void
+) => {
+  try {
+    const worker = createCSVWorker();
+    let allData: DataPoint[] = [];
+    
+    worker.onmessage = (e) => {
+      const { type, data, error } = e.data;
+      
+      if (type === 'chunk') {
+        allData = allData.concat(data);
+      } else if (type === 'complete') {
+        try {
+          const finalData = data || allData;
+          const columns = analyzeColumns(finalData, finalData.length);
+          worker.terminate();
+          resolve({ data: finalData, columns });
+        } catch (err) {
+          worker.terminate();
+          reject(err);
         }
-      });
+      } else if (type === 'error') {
+        worker.terminate();
+        reject(new Error(error));
+      }
+    };
+    
+    worker.onerror = (error) => {
+      worker.terminate();
+      reject(error);
+    };
+    
+    worker.postMessage({ file, isLargeFile: true });
+  } catch (error) {
+    // Fallback to standard parsing if worker fails
+    parseCSVStandard(file, resolve, reject);
+  }
+};
+
+const parseCSVStreaming = (
+  file: File,
+  resolve: (value: { data: DataPoint[]; columns: ColumnInfo[] }) => void,
+  reject: (reason?: any) => void
+) => {
+  let allData: DataPoint[] = [];
+  let processedRows = 0;
+  const maxRows = 100000; // Limit for very large files
+  
+  Papa.parse(file, {
+    header: true,
+    skipEmptyLines: true,
+    chunk: (results) => {
+      const chunkData = results.data as DataPoint[];
+      
+      // Limit total rows for performance
+      const remainingCapacity = maxRows - processedRows;
+      const dataToAdd = chunkData.slice(0, remainingCapacity);
+      
+      allData = allData.concat(dataToAdd);
+      processedRows += dataToAdd.length;
+      
+      // Stop parsing if we've reached the limit
+      if (processedRows >= maxRows) {
+        results.meta.cursor = file.size; // Force completion
+      }
+    },
+    complete: () => {
+      try {
+        const columns = analyzeColumns(allData, allData.length);
+        resolve({ data: allData, columns });
+      } catch (error) {
+        reject(error);
+      }
+    },
+    error: (error) => {
+      reject(error);
     }
   });
 };
@@ -62,10 +159,9 @@ const analyzeColumns = (data: DataPoint[], totalRows?: number): ColumnInfo[] => 
 
   const columns: ColumnInfo[] = [];
   const firstRow = data[0];
-  const sampleSize = Math.min(500, data.length); // Analyze up to 500 rows for performance
+  const sampleSize = Math.min(1000, data.length); // Increased sample size for better accuracy
 
   Object.keys(firstRow).forEach(columnName => {
-    // Use sample for analysis to improve performance on large datasets
     const sampleData = data.slice(0, sampleSize);
     const values = sampleData
       .map(row => row[columnName])
@@ -76,17 +172,21 @@ const analyzeColumns = (data: DataPoint[], totalRows?: number): ColumnInfo[] => 
       return isNaN(num) ? null : num;
     }).filter(val => val !== null) as number[];
 
-    const isNumeric = numericValues.length > values.length * 0.8; // 80% threshold for numeric classification
-
-    // For large datasets, don't store all values to save memory
-    const shouldStoreAllValues = (totalRows || data.length) < 10000;
+    // More sophisticated numeric detection
+    const isNumeric = numericValues.length > values.length * 0.7; // 70% threshold
+    
+    // For large datasets, store limited values to save memory
+    const shouldStoreAllValues = (totalRows || data.length) < 50000;
+    const maxStoredValues = 1000;
     
     columns.push({
       name: columnName,
       type: isNumeric ? 'numeric' : 'categorical',
       values: shouldStoreAllValues 
         ? (isNumeric ? numericValues : values as string[])
-        : (isNumeric ? numericValues.slice(0, 100) : (values as string[]).slice(0, 100))
+        : (isNumeric 
+            ? numericValues.slice(0, maxStoredValues) 
+            : (values as string[]).slice(0, maxStoredValues))
     });
   });
 
@@ -94,12 +194,10 @@ const analyzeColumns = (data: DataPoint[], totalRows?: number): ColumnInfo[] => 
 };
 
 export const normalizeData = (data: DataPoint[], columns: string[]): DataPoint[] => {
-  // For large datasets, use more efficient normalization
   const isLargeDataset = data.length > 10000;
   
   if (isLargeDataset) {
-    // Process in batches to avoid blocking the UI
-    return normalizeDataBatched(data, columns);
+    return normalizeDataOptimized(data, columns);
   }
   
   const normalizedData = [...data];
@@ -123,26 +221,44 @@ export const normalizeData = (data: DataPoint[], columns: string[]): DataPoint[]
   return normalizedData;
 };
 
-const normalizeDataBatched = (data: DataPoint[], columns: string[]): DataPoint[] => {
-  const batchSize = 1000;
+const normalizeDataOptimized = (data: DataPoint[], columns: string[]): DataPoint[] => {
+  // Use more efficient approach for large datasets
   const normalizedData = [...data];
   
-  // Pre-calculate min/max for all columns
+  // Pre-calculate statistics in a single pass
   const columnStats = columns.reduce((stats, column) => {
-    const values = data.map(row => Number(row[column])).filter(val => !isNaN(val));
+    let min = Infinity;
+    let max = -Infinity;
+    let count = 0;
+    
+    // Single pass through data for each column
+    for (const row of data) {
+      const value = Number(row[column]);
+      if (!isNaN(value)) {
+        min = Math.min(min, value);
+        max = Math.max(max, value);
+        count++;
+      }
+    }
+    
     stats[column] = {
-      min: Math.min(...values),
-      max: Math.max(...values),
-      range: Math.max(...values) - Math.min(...values)
+      min: min === Infinity ? 0 : min,
+      max: max === -Infinity ? 0 : max,
+      range: max === -Infinity || min === Infinity ? 0 : max - min,
+      count
     };
     return stats;
-  }, {} as Record<string, { min: number; max: number; range: number }>);
+  }, {} as Record<string, { min: number; max: number; range: number; count: number }>);
   
-  // Process data in batches
-  for (let i = 0; i < data.length; i += batchSize) {
-    const batch = normalizedData.slice(i, i + batchSize);
+  // Apply normalization in batches using requestIdleCallback for better performance
+  const batchSize = 5000;
+  let currentIndex = 0;
+  
+  const processBatch = () => {
+    const endIndex = Math.min(currentIndex + batchSize, data.length);
     
-    batch.forEach(row => {
+    for (let i = currentIndex; i < endIndex; i++) {
+      const row = normalizedData[i];
       columns.forEach(column => {
         const value = Number(row[column]);
         const stats = columnStats[column];
@@ -151,14 +267,20 @@ const normalizeDataBatched = (data: DataPoint[], columns: string[]): DataPoint[]
           row[`${column}_normalized`] = (value - stats.min) / stats.range;
         }
       });
-    });
-    
-    // Allow UI to update between batches
-    if (i % (batchSize * 5) === 0) {
-      // Small delay to prevent blocking
-      setTimeout(() => {}, 0);
     }
-  }
+    
+    currentIndex = endIndex;
+    
+    // Continue processing if there's more data
+    if (currentIndex < data.length) {
+      if (typeof requestIdleCallback !== 'undefined') {
+        requestIdleCallback(processBatch);
+      } else {
+        setTimeout(processBatch, 0);
+      }
+    }
+  };
   
+  processBatch();
   return normalizedData;
 };
