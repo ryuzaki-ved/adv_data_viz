@@ -26,6 +26,13 @@ export interface ChartConfig {
   dataLength?: number;
 }
 
+export interface FileInfo {
+  name: string;
+  size: number;
+  lastModified: number;
+  type: string;
+}
+
 export type ChartType = 'bar' | 'line' | 'pie' | 'scatter' | 'heatmap' | 'footprint';
 
 export type Theme = 'light' | 'dark' | 'accent';

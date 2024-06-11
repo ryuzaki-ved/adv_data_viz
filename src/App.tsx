@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
-import { Database, Settings, TrendingUp, Plus, Maximize2, X } from 'lucide-react';
+import { Database, Settings, TrendingUp, Plus, Maximize2, X, Info } from 'lucide-react';
 import { ThemeProvider, useTheme } from './contexts/ThemeContext';
 import { FileUploader } from './components/FileUploader';
 import { ThemeSelector } from './components/ThemeSelector';
 import { ChartControls } from './components/ChartControls';
 import { ChartRenderer } from './components/ChartRenderer';
 import { parseCSV, normalizeData } from './utils/csvParser';
-import { DataPoint, ColumnInfo, ChartConfig } from './types';
+import { DataPoint, ColumnInfo, ChartConfig, FileInfo } from './types';
 import { ChartControlSingle } from './components/ChartControls';
 import { BarChartComponent } from './components/charts/BarChartComponent';
 import { LineChartComponent } from './components/charts/LineChartComponent';
@@ -18,14 +18,24 @@ import { FootprintComponent } from './components/charts/FootprintComponent';
 function AppContent() {
   const [data, setData] = useState<DataPoint[]>([]);
   const [columns, setColumns] = useState<ColumnInfo[]>([]);
+  const [fileInfo, setFileInfo] = useState<FileInfo | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [configs, setConfigs] = useState<ChartConfig[]>([]);
   const [fullscreenChart, setFullscreenChart] = useState<string | null>(null);
+  const [showColumnDetails, setShowColumnDetails] = useState(false);
   const { theme } = useTheme ? useTheme() : { theme: 'light' };
 
   const handleFileUpload = async (file: File) => {
     setIsLoading(true);
     try {
+      // Store file information
+      setFileInfo({
+        name: file.name,
+        size: file.size,
+        lastModified: file.lastModified,
+        type: file.type
+      });
+
       const { data: parsedData, columns: parsedColumns } = await parseCSV(file);
       
       // Normalize data if needed
@@ -120,6 +130,20 @@ function AppContent() {
     }
   };
 
+  // Format file size
+  const formatFileSize = (bytes: number) => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
+  // Format date
+  const formatDate = (timestamp: number) => {
+    return new Date(timestamp).toLocaleDateString() + ' ' + new Date(timestamp).toLocaleTimeString();
+  };
+
   // Fullscreen modal component
   const FullscreenModal = ({ config }: { config: ChartConfig }) => (
     <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
@@ -199,21 +223,81 @@ function AppContent() {
                       setData([]);
                       setColumns([]);
                       setConfigs([]);
+                      setFileInfo(null);
                     }}
                     className="px-4 py-2 text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
                   >
                     Upload New File
                   </button>
                 </div>
+
+                {/* File Information */}
+                {fileInfo && (
+                  <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                    <div className="flex items-center space-x-2 mb-3">
+                      <Info className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                      <h3 className="text-sm font-semibold text-blue-800 dark:text-blue-300">File Information</h3>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 text-sm">
+                      <div>
+                        <span className="font-medium text-blue-700 dark:text-blue-300">Name:</span>
+                        <p className="text-blue-600 dark:text-blue-400 truncate" title={fileInfo.name}>
+                          {fileInfo.name}
+                        </p>
+                      </div>
+                      <div>
+                        <span className="font-medium text-blue-700 dark:text-blue-300">Size:</span>
+                        <p className="text-blue-600 dark:text-blue-400">{formatFileSize(fileInfo.size)}</p>
+                      </div>
+                      <div>
+                        <span className="font-medium text-blue-700 dark:text-blue-300">Type:</span>
+                        <p className="text-blue-600 dark:text-blue-400">{fileInfo.type || 'text/csv'}</p>
+                      </div>
+                      <div>
+                        <span className="font-medium text-blue-700 dark:text-blue-300">Modified:</span>
+                        <p className="text-blue-600 dark:text-blue-400 text-xs">
+                          {formatDate(fileInfo.lastModified)}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
                 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                   <div className="text-center p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
                     <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{data.length}</div>
                     <div className="text-sm text-blue-700 dark:text-blue-300">Data Points</div>
                   </div>
-                  <div className="text-center p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                  <div 
+                    className="text-center p-4 bg-green-50 dark:bg-green-900/20 rounded-lg cursor-pointer transition-all duration-200 hover:bg-green-100 dark:hover:bg-green-900/30 relative"
+                    onMouseEnter={() => setShowColumnDetails(true)}
+                    onMouseLeave={() => setShowColumnDetails(false)}
+                  >
                     <div className="text-2xl font-bold text-green-600 dark:text-green-400">{columns.length}</div>
                     <div className="text-sm text-green-700 dark:text-green-300">Columns</div>
+                    
+                    {/* Column Details Tooltip */}
+                    {showColumnDetails && (
+                      <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 z-20 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-4 min-w-64 max-w-80">
+                        <div className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">Column Details:</div>
+                        <div className="space-y-2 max-h-48 overflow-y-auto">
+                          {columns.map((column, index) => (
+                            <div key={index} className="flex justify-between items-center text-xs">
+                              <span className="font-medium text-gray-800 dark:text-gray-200 truncate mr-2">
+                                {column.name}
+                              </span>
+                              <span className={`px-2 py-1 rounded text-xs font-medium ${
+                                column.type === 'numeric' 
+                                  ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
+                                  : 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300'
+                              }`}>
+                                {column.type}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                   <div className="text-center p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
                     <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
