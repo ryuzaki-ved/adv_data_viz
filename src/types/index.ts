@@ -33,6 +33,13 @@ export interface FileInfo {
   type: string;
 }
 
+export interface DataFilter {
+  id: string;
+  column: string;
+  operator: 'greater' | 'less' | 'equal' | 'greaterEqual' | 'lessEqual';
+  value: number;
+}
+
 export type ChartType = 'bar' | 'line' | 'pie' | 'scatter' | 'heatmap' | 'footprint';
 
 export type Theme = 'light' | 'dark' | 'accent';

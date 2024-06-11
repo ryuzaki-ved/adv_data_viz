@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
-import { Database, Settings, TrendingUp, Plus, Maximize2, X, Info } from 'lucide-react';
+import { Database, Settings, TrendingUp, Plus, Maximize2, X, Info, ChevronUp, ChevronDown } from 'lucide-react';
 import { ThemeProvider, useTheme } from './contexts/ThemeContext';
 import { FileUploader } from './components/FileUploader';
 import { ThemeSelector } from './components/ThemeSelector';
 import { ChartControls } from './components/ChartControls';
 import { ChartRenderer } from './components/ChartRenderer';
 import { parseCSV, normalizeData } from './utils/csvParser';
-import { DataPoint, ColumnInfo, ChartConfig, FileInfo } from './types';
+import { DataPoint, ColumnInfo, ChartConfig, FileInfo, DataFilter } from './types';
 import { ChartControlSingle } from './components/ChartControls';
 import { BarChartComponent } from './components/charts/BarChartComponent';
 import { LineChartComponent } from './components/charts/LineChartComponent';
@@ -14,15 +14,19 @@ import { PieChartComponent } from './components/charts/PieChartComponent';
 import { ScatterChartComponent } from './components/charts/ScatterChartComponent';
 import { HeatmapComponent } from './components/charts/HeatmapComponent';
 import { FootprintComponent } from './components/charts/FootprintComponent';
+import { DataFilterComponent } from './components/DataFilterComponent';
 
 function AppContent() {
   const [data, setData] = useState<DataPoint[]>([]);
+  const [originalData, setOriginalData] = useState<DataPoint[]>([]);
   const [columns, setColumns] = useState<ColumnInfo[]>([]);
   const [fileInfo, setFileInfo] = useState<FileInfo | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [configs, setConfigs] = useState<ChartConfig[]>([]);
   const [fullscreenChart, setFullscreenChart] = useState<string | null>(null);
   const [showColumnDetails, setShowColumnDetails] = useState(false);
+  const [controlsCollapsed, setControlsCollapsed] = useState<Record<string, boolean>>({});
+  const [dataFilters, setDataFilters] = useState<DataFilter[]>([]);
   const { theme } = useTheme ? useTheme() : { theme: 'light' };
 
   const handleFileUpload = async (file: File) => {
@@ -42,8 +46,10 @@ function AppContent() {
       const numericColumns = parsedColumns.filter(col => col.type === 'numeric').map(col => col.name);
       const normalizedData = normalizeData(parsedData, numericColumns);
       
+      setOriginalData(normalizedData);
       setData(normalizedData);
       setColumns(parsedColumns);
+      setDataFilters([]);
       
       // Auto-configure first chart
       const firstCategorical = parsedColumns.find(col => col.type === 'categorical');
@@ -67,20 +73,60 @@ function AppContent() {
     }
   };
 
-  const hasData = data.length > 0 && columns.length > 0;
+  // Apply filters to data
+  const applyFilters = (filters: DataFilter[]) => {
+    if (filters.length === 0) {
+      setData(originalData);
+      return;
+    }
 
+    let filteredData = [...originalData];
+    
+    filters.forEach(filter => {
+      filteredData = filteredData.filter(row => {
+        const value = Number(row[filter.column]);
+        if (isNaN(value)) return true;
+        
+        switch (filter.operator) {
+          case 'greater':
+            return value > filter.value;
+          case 'less':
+            return value < filter.value;
+          case 'equal':
+            return value === filter.value;
+          case 'greaterEqual':
+            return value >= filter.value;
+          case 'lessEqual':
+            return value <= filter.value;
+          default:
+            return true;
+        }
+      });
+    });
+    
+    setData(filteredData);
+  };
+
+  const handleFiltersChange = (filters: DataFilter[]) => {
+    setDataFilters(filters);
+    applyFilters(filters);
+  };
+
+  const hasData = data.length > 0 && columns.length > 0;
   const numericColumns = columns.filter(col => col.type === 'numeric');
 
   // Helper to update a single config
   const updateConfig = (id: string, updates: Partial<ChartConfig>) => {
     setConfigs(configs => configs.map(config => config.id === id ? { ...config, ...updates } : config));
   };
+  
   // Helper to remove a config
   const removeConfig = (id: string) => {
     if (configs.length > 1) {
       setConfigs(configs => configs.filter(config => config.id !== id));
     }
   };
+  
   // Helper to add a new chart
   const addNewChart = () => {
     const firstCategorical = columns.find(col => col.type === 'categorical');
@@ -94,6 +140,14 @@ function AppContent() {
       title: `Chart ${configs.length + 1}`
     };
     setConfigs([...configs, newConfig]);
+  };
+
+  // Toggle controls collapse
+  const toggleControlsCollapse = (chartId: string) => {
+    setControlsCollapsed(prev => ({
+      ...prev,
+      [chartId]: !prev[chartId]
+    }));
   };
 
   // Chart rendering logic (from ChartRenderer)
@@ -142,6 +196,33 @@ function AppContent() {
   // Format date
   const formatDate = (timestamp: number) => {
     return new Date(timestamp).toLocaleDateString() + ' ' + new Date(timestamp).toLocaleTimeString();
+  };
+
+  // Handle column tooltip visibility
+  const handleColumnCardMouseEnter = () => {
+    setShowColumnDetails(true);
+  };
+
+  const handleColumnCardMouseLeave = (e: React.MouseEvent) => {
+    // Check if mouse is leaving the entire card area (including tooltip)
+    const rect = e.currentTarget.getBoundingClientRect();
+    const tooltipRect = document.querySelector('.column-tooltip')?.getBoundingClientRect();
+    
+    if (tooltipRect) {
+      const combinedRect = {
+        left: Math.min(rect.left, tooltipRect.left),
+        right: Math.max(rect.right, tooltipRect.right),
+        top: Math.min(rect.top, tooltipRect.top),
+        bottom: Math.max(rect.bottom, tooltipRect.bottom)
+      };
+      
+      if (e.clientX < combinedRect.left || e.clientX > combinedRect.right ||
+          e.clientY < combinedRect.top || e.clientY > combinedRect.bottom) {
+        setShowColumnDetails(false);
+      }
+    } else {
+      setShowColumnDetails(false);
+    }
   };
 
   // Fullscreen modal component
@@ -221,9 +302,11 @@ function AppContent() {
                   <button
                     onClick={() => {
                       setData([]);
+                      setOriginalData([]);
                       setColumns([]);
                       setConfigs([]);
                       setFileInfo(null);
+                      setDataFilters([]);
                     }}
                     className="px-4 py-2 text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
                   >
@@ -266,19 +349,30 @@ function AppContent() {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                   <div className="text-center p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
                     <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{data.length}</div>
-                    <div className="text-sm text-blue-700 dark:text-blue-300">Data Points</div>
+                    <div className="text-sm text-blue-700 dark:text-blue-300">
+                      {dataFilters.length > 0 ? 'Filtered Data Points' : 'Data Points'}
+                    </div>
+                    {dataFilters.length > 0 && (
+                      <div className="text-xs text-blue-500 dark:text-blue-400 mt-1">
+                        ({originalData.length} total)
+                      </div>
+                    )}
                   </div>
                   <div 
                     className="text-center p-4 bg-green-50 dark:bg-green-900/20 rounded-lg cursor-pointer transition-all duration-200 hover:bg-green-100 dark:hover:bg-green-900/30 relative"
-                    onMouseEnter={() => setShowColumnDetails(true)}
-                    onMouseLeave={() => setShowColumnDetails(false)}
+                    onMouseEnter={handleColumnCardMouseEnter}
+                    onMouseLeave={handleColumnCardMouseLeave}
                   >
                     <div className="text-2xl font-bold text-green-600 dark:text-green-400">{columns.length}</div>
                     <div className="text-sm text-green-700 dark:text-green-300">Columns</div>
                     
                     {/* Column Details Tooltip */}
                     {showColumnDetails && (
-                      <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 z-20 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-4 min-w-64 max-w-80">
+                      <div 
+                        className="column-tooltip absolute top-full left-1/2 transform -translate-x-1/2 mt-2 z-20 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-4 min-w-64 max-w-80"
+                        onMouseEnter={() => setShowColumnDetails(true)}
+                        onMouseLeave={() => setShowColumnDetails(false)}
+                      >
                         <div className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">Column Details:</div>
                         <div className="space-y-2 max-h-48 overflow-y-auto">
                           {columns.map((column, index) => (
@@ -307,6 +401,14 @@ function AppContent() {
                   </div>
                 </div>
 
+                {/* Data Filters */}
+                <DataFilterComponent
+                  columns={numericColumns}
+                  filters={dataFilters}
+                  onFiltersChange={handleFiltersChange}
+                  theme={theme}
+                />
+
                 <div className="flex justify-between items-center mb-6">
                   <h2 className="text-xl font-semibold text-gray-900 dark:text-white flex items-center space-x-2">
                     <Settings className="h-5 w-5" />
@@ -325,18 +427,38 @@ function AppContent() {
                 <div className="space-y-8">
                   {configs.map((config, idx) => (
                     <div key={config.id} className="bg-gray-50 dark:bg-gray-900/50 rounded-xl p-6 border border-gray-200 dark:border-gray-700">
-                      {/* Chart Controls */}
-                      <div className="mb-6">
-                        <ChartControlSingle
-                          config={config}
-                          columns={columns}
-                          numericColumns={numericColumns}
-                          onUpdate={(updates) => updateConfig(config.id, updates)}
-                          onRemove={() => removeConfig(config.id)}
-                          theme={theme}
-                          disableRemove={configs.length === 1}
-                        />
+                      {/* Chart Controls Header with Collapse Toggle */}
+                      <div className="flex justify-between items-center mb-4">
+                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                          Chart Controls - {config.title || `Chart ${idx + 1}`}
+                        </h3>
+                        <button
+                          onClick={() => toggleControlsCollapse(config.id)}
+                          className="p-2 rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+                          title={controlsCollapsed[config.id] ? 'Show controls' : 'Hide controls'}
+                        >
+                          {controlsCollapsed[config.id] ? (
+                            <ChevronDown className="h-4 w-4" />
+                          ) : (
+                            <ChevronUp className="h-4 w-4" />
+                          )}
+                        </button>
                       </div>
+
+                      {/* Chart Controls - Collapsible */}
+                      {!controlsCollapsed[config.id] && (
+                        <div className="mb-6">
+                          <ChartControlSingle
+                            config={config}
+                            columns={columns}
+                            numericColumns={numericColumns}
+                            onUpdate={(updates) => updateConfig(config.id, updates)}
+                            onRemove={() => removeConfig(config.id)}
+                            theme={theme}
+                            disableRemove={configs.length === 1}
+                          />
+                        </div>
+                      )}
                       
                       {/* Chart Display */}
                       <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
