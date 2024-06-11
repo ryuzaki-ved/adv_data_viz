@@ -9,6 +9,21 @@ export interface ChartConfig {
   chartType: ChartType;
   normalized: boolean;
   title?: string;
+  width?: number;
+  height?: number;
+  minW?: number;
+  maxW?: number;
+  minH?: number;
+  maxH?: number;
+  xMin?: number;
+  xMax?: number;
+  yMin?: number;
+  yMax?: number;
+  xDataMin?: number;
+  xDataMax?: number;
+  yDataMin?: number;
+  yDataMax?: number;
+  dataLength?: number;
 }
 
 export type ChartType = 'bar' | 'line' | 'pie' | 'scatter' | 'heatmap' | 'footprint';

@@ -207,16 +207,19 @@ function AppContent() {
                   </h2>
                   <button
                     onClick={addNewChart}
-                    className="px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center space-x-2 bg-blue-600 text-white shadow-lg"
+                    className="px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center space-x-2 bg-blue-600 text-white shadow-lg hover:bg-blue-700"
                   >
                     <Plus className="h-4 w-4" />
                     <span>Add Chart</span>
                   </button>
                 </div>
+
+                {/* Charts Section - Improved Layout */}
                 <div className="space-y-8">
                   {configs.map((config, idx) => (
-                    <div key={config.id} className="flex flex-col md:flex-row gap-6 items-stretch">
-                      <div className="md:w-1/3">
+                    <div key={config.id} className="bg-gray-50 dark:bg-gray-900/50 rounded-xl p-6 border border-gray-200 dark:border-gray-700">
+                      {/* Chart Controls */}
+                      <div className="mb-6">
                         <ChartControlSingle
                           config={config}
                           columns={columns}
@@ -227,7 +230,17 @@ function AppContent() {
                           disableRemove={configs.length === 1}
                         />
                       </div>
-                      <div className="md:w-2/3 flex items-center">
+                      
+                      {/* Chart Display */}
+                      <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+                        <div className="flex justify-between items-center mb-4">
+                          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                            {config.title || `Chart ${idx + 1}`}
+                          </h3>
+                          <div className="text-sm text-gray-600 dark:text-gray-400">
+                            {config.xAxis} vs {Array.isArray(config.yAxis) ? config.yAxis.join(', ') : config.yAxis}
+                          </div>
+                        </div>
                         <div className="w-full">
                           {renderChart(config)}
                         </div>
