@@ -54,6 +54,72 @@ export const LineChartComponent: React.FC<LineChartComponentProps> = ({
     return sampled;
   }, [data]);
 
+  // Calculate data ranges with proper padding
+  const dataRanges = React.useMemo(() => {
+    const xValues = optimizedData.map(d => {
+      const val = d[xAxis];
+      return typeof val === 'number' ? val : parseFloat(String(val));
+    }).filter(v => !isNaN(v));
+
+    const yValues = yKeys.flatMap(key => 
+      optimizedData.map(d => {
+        const val = normalized ? d[`${key}_normalized`] : d[key];
+        return typeof val === 'number' ? val : parseFloat(String(val));
+      }).filter(v => !isNaN(v))
+    );
+
+    const xRange = xValues.length > 0 ? {
+      min: Math.min(...xValues),
+      max: Math.max(...xValues)
+    } : { min: 0, max: 100 };
+
+    const yRange = yValues.length > 0 ? {
+      min: Math.min(...yValues),
+      max: Math.max(...yValues)
+    } : { min: 0, max: 100 };
+
+    // Add padding (5% on each side for line charts)
+    const xPadding = (xRange.max - xRange.min) * 0.05;
+    const yPadding = (yRange.max - yRange.min) * 0.1;
+
+    return {
+      x: {
+        min: xRange.min - xPadding,
+        max: xRange.max + xPadding,
+        dataMin: xRange.min,
+        dataMax: xRange.max
+      },
+      y: {
+        min: yRange.min - yPadding,
+        max: yRange.max + yPadding,
+        dataMin: yRange.min,
+        dataMax: yRange.max
+      }
+    };
+  }, [optimizedData, xAxis, yKeys, normalized]);
+
+  // Calculate effective domains
+  const getXDomain = () => {
+    if (zoomDomain.left !== undefined && zoomDomain.right !== undefined) {
+      return [zoomDomain.left, zoomDomain.right];
+    }
+    if (xMin !== undefined || xMax !== undefined) {
+      const min = xMin !== undefined ? xMin : dataRanges.x.min;
+      const max = xMax !== undefined ? xMax : dataRanges.x.max;
+      return [min, max];
+    }
+    return [dataRanges.x.min, dataRanges.x.max];
+  };
+
+  const getYDomain = () => {
+    if (yMin !== undefined || yMax !== undefined) {
+      const min = yMin !== undefined ? yMin : dataRanges.y.min;
+      const max = yMax !== undefined ? yMax : dataRanges.y.max;
+      return [min, max];
+    }
+    return [dataRanges.y.min, dataRanges.y.max];
+  };
+
   const handleZoomIn = () => {
     const currentDomain = zoomDomain;
     const dataLength = optimizedData.length;
@@ -121,6 +187,9 @@ export const LineChartComponent: React.FC<LineChartComponentProps> = ({
     return null;
   };
 
+  // Determine if x-axis should be numeric or categorical
+  const isXAxisNumeric = typeof optimizedData[0]?.[xAxis] === 'number';
+
   return (
     <div className="relative">
       {/* Chart Controls */}
@@ -172,8 +241,8 @@ export const LineChartComponent: React.FC<LineChartComponentProps> = ({
             fontSize={11}
             tickLine={false}
             axisLine={false}
-            domain={zoomDomain.left !== undefined ? [zoomDomain.left, zoomDomain.right] : (xMin !== undefined || xMax !== undefined ? [xMin ?? 'dataMin', xMax ?? 'dataMax'] : undefined)}
-            type={typeof optimizedData[0]?.[xAxis] === 'number' ? 'number' : 'category'}
+            domain={isXAxisNumeric ? getXDomain() : undefined}
+            type={isXAxisNumeric ? 'number' : 'category'}
             interval={optimizedData.length > 100 ? 'preserveStartEnd' : 0}
           />
           <YAxis 
@@ -183,7 +252,7 @@ export const LineChartComponent: React.FC<LineChartComponentProps> = ({
             tickLine={false}
             axisLine={false}
             label={yKeys[0] ? { value: yKeys[0], angle: -90, position: 'insideLeft', fill: themeColors[0], fontSize: 12 } : undefined}
-            domain={yMin !== undefined || yMax !== undefined ? [yMin ?? 'dataMin', yMax ?? 'dataMax'] : undefined}
+            domain={getYDomain()}
           />
           {showRightAxis && (
             <YAxis 
@@ -194,7 +263,7 @@ export const LineChartComponent: React.FC<LineChartComponentProps> = ({
               tickLine={false}
               axisLine={false}
               label={yKeys[1] ? { value: yKeys[1], angle: 90, position: 'insideRight', fill: themeColors[1], fontSize: 12 } : undefined}
-              domain={yMin !== undefined || yMax !== undefined ? [yMin ?? 'dataMin', yMax ?? 'dataMax'] : undefined}
+              domain={getYDomain()}
             />
           )}
           <Tooltip content={<CustomTooltip />} />

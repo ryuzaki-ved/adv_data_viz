@@ -150,10 +150,49 @@ function AppContent() {
     }));
   };
 
+  // Calculate data ranges for axis controls
+  const calculateDataRanges = React.useCallback((config: ChartConfig) => {
+    const yKeys = Array.isArray(config.yAxis) ? config.yAxis : [config.yAxis];
+    
+    const xValues = data.map(d => {
+      const val = d[config.xAxis];
+      return typeof val === 'number' ? val : parseFloat(String(val));
+    }).filter(v => !isNaN(v));
+
+    const yValues = yKeys.flatMap(key => 
+      data.map(d => {
+        const val = config.normalized ? d[`${key}_normalized`] : d[key];
+        return typeof val === 'number' ? val : parseFloat(String(val));
+      }).filter(v => !isNaN(v))
+    );
+
+    const xRange = xValues.length > 0 ? {
+      min: Math.min(...xValues),
+      max: Math.max(...xValues)
+    } : { min: 0, max: 100 };
+
+    const yRange = yValues.length > 0 ? {
+      min: Math.min(...yValues),
+      max: Math.max(...yValues)
+    } : { min: 0, max: 100 };
+
+    return {
+      xDataMin: xRange.min,
+      xDataMax: xRange.max,
+      yDataMin: yRange.min,
+      yDataMax: yRange.max,
+      dataLength: data.length
+    };
+  }, [data]);
+
   // Chart rendering logic with enhanced props
   const renderChart = (config: ChartConfig, isFullscreen = false) => {
     const width = isFullscreen ? '100%' : (config.width === undefined ? '100%' : (config.width === 0 ? '100%' : config.width));
     const height = isFullscreen ? 600 : (config.height === undefined ? 350 : config.height);
+    
+    // Calculate data ranges for this specific chart
+    const dataRanges = calculateDataRanges(config);
+    
     const commonProps = {
       data,
       xAxis: config.xAxis,
@@ -164,7 +203,8 @@ function AppContent() {
       xMin: config.xMin,
       xMax: config.xMax,
       yMin: config.yMin,
-      yMax: config.yMax
+      yMax: config.yMax,
+      ...dataRanges
     };
     
     switch (config.chartType) {
@@ -432,66 +472,69 @@ function AppContent() {
 
                 {/* Charts Section - Enhanced Layout */}
                 <div className="space-y-8">
-                  {configs.map((config, idx) => (
-                    <div key={config.id} className="bg-gray-50 dark:bg-gray-900/50 rounded-xl p-6 border border-gray-200 dark:border-gray-700 transition-all duration-200 hover:shadow-lg">
-                      {/* Chart Controls Header with Collapse Toggle */}
-                      <div className="flex justify-between items-center mb-4">
-                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                          Chart Controls - {config.title || `Chart ${idx + 1}`}
-                        </h3>
-                        <button
-                          onClick={() => toggleControlsCollapse(config.id)}
-                          className="p-2 rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
-                          title={controlsCollapsed[config.id] ? 'Show controls' : 'Hide controls'}
-                        >
-                          {controlsCollapsed[config.id] ? (
-                            <ChevronDown className="h-4 w-4" />
-                          ) : (
-                            <ChevronUp className="h-4 w-4" />
-                          )}
-                        </button>
-                      </div>
-
-                      {/* Chart Controls - Collapsible */}
-                      {!controlsCollapsed[config.id] && (
-                        <div className="mb-6">
-                          <ChartControlSingle
-                            config={config}
-                            columns={columns}
-                            numericColumns={numericColumns}
-                            onUpdate={(updates) => updateConfig(config.id, updates)}
-                            onRemove={() => removeConfig(config.id)}
-                            theme={theme}
-                            disableRemove={configs.length === 1}
-                          />
-                        </div>
-                      )}
-                      
-                      {/* Chart Display */}
-                      <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+                  {configs.map((config, idx) => {
+                    const dataRanges = calculateDataRanges(config);
+                    return (
+                      <div key={config.id} className="bg-gray-50 dark:bg-gray-900/50 rounded-xl p-6 border border-gray-200 dark:border-gray-700 transition-all duration-200 hover:shadow-lg">
+                        {/* Chart Controls Header with Collapse Toggle */}
                         <div className="flex justify-between items-center mb-4">
                           <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                            {config.title || `Chart ${idx + 1}`}
+                            Chart Controls - {config.title || `Chart ${idx + 1}`}
                           </h3>
-                          <div className="flex items-center space-x-3">
-                            <div className="text-sm text-gray-600 dark:text-gray-400">
-                              {config.xAxis} vs {Array.isArray(config.yAxis) ? config.yAxis.join(', ') : config.yAxis}
+                          <button
+                            onClick={() => toggleControlsCollapse(config.id)}
+                            className="p-2 rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+                            title={controlsCollapsed[config.id] ? 'Show controls' : 'Hide controls'}
+                          >
+                            {controlsCollapsed[config.id] ? (
+                              <ChevronDown className="h-4 w-4" />
+                            ) : (
+                              <ChevronUp className="h-4 w-4" />
+                            )}
+                          </button>
+                        </div>
+
+                        {/* Chart Controls - Collapsible */}
+                        {!controlsCollapsed[config.id] && (
+                          <div className="mb-6">
+                            <ChartControlSingle
+                              config={{ ...config, ...dataRanges }}
+                              columns={columns}
+                              numericColumns={numericColumns}
+                              onUpdate={(updates) => updateConfig(config.id, updates)}
+                              onRemove={() => removeConfig(config.id)}
+                              theme={theme}
+                              disableRemove={configs.length === 1}
+                            />
+                          </div>
+                        )}
+                        
+                        {/* Chart Display */}
+                        <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+                          <div className="flex justify-between items-center mb-4">
+                            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                              {config.title || `Chart ${idx + 1}`}
+                            </h3>
+                            <div className="flex items-center space-x-3">
+                              <div className="text-sm text-gray-600 dark:text-gray-400">
+                                {config.xAxis} vs {Array.isArray(config.yAxis) ? config.yAxis.join(', ') : config.yAxis}
+                              </div>
+                              <button
+                                onClick={() => setFullscreenChart(config.id)}
+                                className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                                title="View in fullscreen"
+                              >
+                                <Maximize2 className="h-4 w-4" />
+                              </button>
                             </div>
-                            <button
-                              onClick={() => setFullscreenChart(config.id)}
-                              className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
-                              title="View in fullscreen"
-                            >
-                              <Maximize2 className="h-4 w-4" />
-                            </button>
+                          </div>
+                          <div className="w-full">
+                            {renderChart(config)}
                           </div>
                         </div>
-                        <div className="w-full">
-                          {renderChart(config)}
-                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             </div>

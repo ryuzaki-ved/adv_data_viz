@@ -57,21 +57,80 @@ export const ScatterChartComponent: React.FC<ScatterChartComponentProps> = ({
     return sampled;
   }, [data, xAxis]);
 
-  // For each yKey, create scatter data
-  const scatterDataArr = yKeys.map(y =>
-    optimizedData.map(item => ({
-      x: Number(item[xAxis]),
-      y: Number(normalized ? item[`${y}_normalized`] : item[y]),
-      originalData: item
-    })).filter(item => !isNaN(item.x) && !isNaN(item.y))
-  );
+  // For each yKey, create scatter data with proper range calculation
+  const scatterDataArr = React.useMemo(() => {
+    return yKeys.map(y =>
+      optimizedData.map(item => ({
+        x: Number(item[xAxis]),
+        y: Number(normalized ? item[`${y}_normalized`] : item[y]),
+        originalData: item
+      })).filter(item => !isNaN(item.x) && !isNaN(item.y))
+    );
+  }, [optimizedData, xAxis, yKeys, normalized]);
 
-  const handleZoomIn = () => {
+  // Calculate data ranges with proper padding
+  const dataRanges = React.useMemo(() => {
     const allXValues = scatterDataArr.flat().map(d => d.x);
     const allYValues = scatterDataArr.flat().map(d => d.y);
-    
-    const currentXDomain = zoomDomain.x || [Math.min(...allXValues), Math.max(...allXValues)];
-    const currentYDomain = zoomDomain.y || [Math.min(...allYValues), Math.max(...allYValues)];
+
+    const xRange = allXValues.length > 0 ? {
+      min: Math.min(...allXValues),
+      max: Math.max(...allXValues)
+    } : { min: 0, max: 100 };
+
+    const yRange = allYValues.length > 0 ? {
+      min: Math.min(...allYValues),
+      max: Math.max(...allYValues)
+    } : { min: 0, max: 100 };
+
+    // Add padding (10% on each side)
+    const xPadding = (xRange.max - xRange.min) * 0.1;
+    const yPadding = (yRange.max - yRange.min) * 0.1;
+
+    return {
+      x: {
+        min: xRange.min - xPadding,
+        max: xRange.max + xPadding,
+        dataMin: xRange.min,
+        dataMax: xRange.max
+      },
+      y: {
+        min: yRange.min - yPadding,
+        max: yRange.max + yPadding,
+        dataMin: yRange.min,
+        dataMax: yRange.max
+      }
+    };
+  }, [scatterDataArr]);
+
+  // Calculate effective domains
+  const getXDomain = () => {
+    if (zoomDomain.x) {
+      return zoomDomain.x;
+    }
+    if (xMin !== undefined || xMax !== undefined) {
+      const min = xMin !== undefined ? xMin : dataRanges.x.min;
+      const max = xMax !== undefined ? xMax : dataRanges.x.max;
+      return [min, max];
+    }
+    return [dataRanges.x.min, dataRanges.x.max];
+  };
+
+  const getYDomain = () => {
+    if (zoomDomain.y) {
+      return zoomDomain.y;
+    }
+    if (yMin !== undefined || yMax !== undefined) {
+      const min = yMin !== undefined ? yMin : dataRanges.y.min;
+      const max = yMax !== undefined ? yMax : dataRanges.y.max;
+      return [min, max];
+    }
+    return [dataRanges.y.min, dataRanges.y.max];
+  };
+
+  const handleZoomIn = () => {
+    const currentXDomain = zoomDomain.x || [dataRanges.x.min, dataRanges.x.max];
+    const currentYDomain = zoomDomain.y || [dataRanges.y.min, dataRanges.y.max];
     
     const xCenter = (currentXDomain[0] + currentXDomain[1]) / 2;
     const yCenter = (currentYDomain[0] + currentYDomain[1]) / 2;
@@ -85,20 +144,23 @@ export const ScatterChartComponent: React.FC<ScatterChartComponentProps> = ({
   };
 
   const handleZoomOut = () => {
-    const allXValues = scatterDataArr.flat().map(d => d.x);
-    const allYValues = scatterDataArr.flat().map(d => d.y);
-    
-    const currentXDomain = zoomDomain.x || [Math.min(...allXValues), Math.max(...allXValues)];
-    const currentYDomain = zoomDomain.y || [Math.min(...allYValues), Math.max(...allYValues)];
+    const currentXDomain = zoomDomain.x || [dataRanges.x.min, dataRanges.x.max];
+    const currentYDomain = zoomDomain.y || [dataRanges.y.min, dataRanges.y.max];
     
     const xCenter = (currentXDomain[0] + currentXDomain[1]) / 2;
     const yCenter = (currentYDomain[0] + currentYDomain[1]) / 2;
-    const xRange = Math.min((currentXDomain[1] - currentXDomain[0]) * 2, Math.max(...allXValues) - Math.min(...allXValues));
-    const yRange = Math.min((currentYDomain[1] - currentYDomain[0]) * 2, Math.max(...allYValues) - Math.min(...allYValues));
+    const xRange = Math.min((currentXDomain[1] - currentXDomain[0]) * 2, dataRanges.x.max - dataRanges.x.min);
+    const yRange = Math.min((currentYDomain[1] - currentYDomain[0]) * 2, dataRanges.y.max - dataRanges.y.min);
     
     setZoomDomain({
-      x: [xCenter - xRange / 2, xCenter + xRange / 2],
-      y: [yCenter - yRange / 2, yCenter + yRange / 2]
+      x: [
+        Math.max(dataRanges.x.min, xCenter - xRange / 2), 
+        Math.min(dataRanges.x.max, xCenter + xRange / 2)
+      ],
+      y: [
+        Math.max(dataRanges.y.min, yCenter - yRange / 2), 
+        Math.min(dataRanges.y.max, yCenter + yRange / 2)
+      ]
     });
   };
 
@@ -174,7 +236,7 @@ export const ScatterChartComponent: React.FC<ScatterChartComponentProps> = ({
             fontSize={11}
             tickLine={false}
             axisLine={false}
-            domain={zoomDomain.x || (xMin !== undefined || xMax !== undefined ? [xMin ?? 'dataMin', xMax ?? 'dataMax'] : ['dataMin', 'dataMax'])}
+            domain={getXDomain()}
           />
           <YAxis 
             yAxisId="left"
@@ -185,7 +247,7 @@ export const ScatterChartComponent: React.FC<ScatterChartComponentProps> = ({
             tickLine={false}
             axisLine={false}
             label={yKeys[0] ? { value: yKeys[0], angle: -90, position: 'insideLeft', fill: themeColors[0], fontSize: 12 } : undefined}
-            domain={zoomDomain.y || (yMin !== undefined || yMax !== undefined ? [yMin ?? 'dataMin', yMax ?? 'dataMax'] : ['dataMin', 'dataMax'])}
+            domain={getYDomain()}
           />
           {showRightAxis && (
             <YAxis 
@@ -198,7 +260,7 @@ export const ScatterChartComponent: React.FC<ScatterChartComponentProps> = ({
               tickLine={false}
               axisLine={false}
               label={yKeys[1] ? { value: yKeys[1], angle: 90, position: 'insideRight', fill: themeColors[1], fontSize: 12 } : undefined}
-              domain={zoomDomain.y || (yMin !== undefined || yMax !== undefined ? [yMin ?? 'dataMin', yMax ?? 'dataMax'] : ['dataMin', 'dataMax'])}
+              domain={getYDomain()}
             />
           )}
           <Tooltip content={<CustomTooltip />} cursor={{ strokeDasharray: '3 3' }} />
