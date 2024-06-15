@@ -305,35 +305,42 @@ export const ScatterChartComponent: React.FC<ScatterChartComponentProps> = ({
     }
   }, []);
 
-  // Enhanced tooltip with correlation info
-  const CustomTooltip = ({ active, payload, label }: any) => {
-    if (active && payload && payload.length) {
+  // Compact tooltip that follows cursor
+  const CustomTooltip = ({ active, payload, label, coordinate }: any) => {
+    if (active && payload && payload.length && coordinate) {
       const data = payload[0].payload;
       return (
-        <div className={`p-4 rounded-xl shadow-2xl border backdrop-blur-sm transition-all duration-200 ${
-          theme === 'dark' 
-            ? 'bg-gray-900/95 border-gray-700 text-white' 
-            : 'bg-white/95 border-gray-200 text-gray-900'
-        }`}>
-          <div className="flex items-center space-x-2 mb-3">
-            <Target className="h-4 w-4 text-blue-500" />
-            <p className="font-semibold text-sm">Data Point</p>
+        <div 
+          className={`fixed z-50 px-3 py-2 rounded-lg shadow-xl border text-xs font-medium pointer-events-none transition-all duration-200 ${
+            theme === 'dark' 
+              ? 'bg-gray-900/95 border-gray-600 text-white' 
+              : 'bg-white/95 border-gray-200 text-gray-900'
+          }`}
+          style={{
+            left: coordinate.x + 10,
+            top: coordinate.y - 10,
+            transform: 'translate(0, -100%)'
+          }}
+        >
+          <div className="flex items-center space-x-2 mb-1">
+            <Target className="h-3 w-3 text-blue-500" />
+            <span className="font-semibold">Data Point</span>
           </div>
-          <div className="space-y-2">
+          <div className="space-y-1">
             <div className="flex justify-between items-center">
-              <span className="text-sm font-medium">{xAxis}:</span>
-              <span className="text-sm font-bold">{data.x?.toFixed(3)}</span>
+              <span className="text-xs">{xAxis}:</span>
+              <span className="text-xs font-bold">{data.x?.toFixed(3)}</span>
             </div>
             {payload.map((entry: any, index: number) => (
               <div key={index} className="flex justify-between items-center">
-                <div className="flex items-center space-x-2">
+                <div className="flex items-center space-x-1">
                   <div 
-                    className="w-3 h-3 rounded-full"
+                    className="w-2 h-2 rounded-full"
                     style={{ backgroundColor: entry.color }}
                   />
-                  <span className="text-sm font-medium">{entry.name}:</span>
+                  <span className="text-xs">{entry.name}:</span>
                 </div>
-                <span className="text-sm font-bold">{entry.value?.toFixed(3)}</span>
+                <span className="text-xs font-bold">{entry.value?.toFixed(3)}</span>
               </div>
             ))}
           </div>

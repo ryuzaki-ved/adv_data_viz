@@ -29,6 +29,8 @@ export const BarChartComponent: React.FC<BarChartComponentProps> = ({
   const [hoveredBar, setHoveredBar] = useState<string | null>(null);
   const [selectedBars, setSelectedBars] = useState<Set<string>>(new Set());
   const [enableOptimization, setEnableOptimization] = useState(data.length > 1000);
+  const [tooltipData, setTooltipData] = useState<any>(null);
+  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
   const chartRef = useRef<any>(null);
   
   const yKeys = Array.isArray(yAxis) ? yAxis : [yAxis];
@@ -278,30 +280,37 @@ export const BarChartComponent: React.FC<BarChartComponentProps> = ({
     }
   }, []);
 
-  // Professional tooltip with enhanced styling
-  const CustomTooltip = ({ active, payload, label }: any) => {
-    if (active && payload && payload.length) {
+  // Compact tooltip that follows cursor
+  const CustomTooltip = ({ active, payload, label, coordinate }: any) => {
+    if (active && payload && payload.length && coordinate) {
       return (
-        <div className={`p-4 rounded-xl shadow-2xl border backdrop-blur-sm transition-all duration-200 ${
-          theme === 'dark' 
-            ? 'bg-gray-900/95 border-gray-700 text-white' 
-            : 'bg-white/95 border-gray-200 text-gray-900'
-        }`}>
-          <div className="flex items-center space-x-2 mb-3">
-            <TrendingUp className="h-4 w-4 text-blue-500" />
-            <p className="font-semibold text-sm">{`${xAxis}: ${label}`}</p>
+        <div 
+          className={`fixed z-50 px-3 py-2 rounded-lg shadow-xl border text-xs font-medium pointer-events-none transition-all duration-200 ${
+            theme === 'dark' 
+              ? 'bg-gray-900/95 border-gray-600 text-white' 
+              : 'bg-white/95 border-gray-200 text-gray-900'
+          }`}
+          style={{
+            left: coordinate.x + 10,
+            top: coordinate.y - 10,
+            transform: 'translate(0, -100%)'
+          }}
+        >
+          <div className="flex items-center space-x-2 mb-1">
+            <TrendingUp className="h-3 w-3 text-blue-500" />
+            <span className="font-semibold">{`${xAxis}: ${label}`}</span>
           </div>
-          <div className="space-y-2">
+          <div className="space-y-1">
             {payload.map((entry: any, index: number) => (
-              <div key={index} className="flex items-center justify-between space-x-4">
-                <div className="flex items-center space-x-2">
+              <div key={index} className="flex items-center justify-between space-x-3">
+                <div className="flex items-center space-x-1">
                   <div 
-                    className="w-3 h-3 rounded-full"
+                    className="w-2 h-2 rounded-full"
                     style={{ backgroundColor: entry.color }}
                   />
-                  <span className="text-sm font-medium">{entry.name}</span>
+                  <span className="text-xs">{entry.name}</span>
                 </div>
-                <span className="text-sm font-bold">
+                <span className="text-xs font-bold">
                   {typeof entry.value === 'number' ? entry.value.toLocaleString(undefined, {
                     minimumFractionDigits: 2,
                     maximumFractionDigits: 2

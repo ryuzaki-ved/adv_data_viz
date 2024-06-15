@@ -97,7 +97,9 @@ function AppContent() {
           yAxis: firstNumeric.name,
           chartType: 'bar',
           normalized: false,
-          title: 'Chart 1'
+          title: 'Chart 1',
+          xOrder: 'file',
+          yOrder: 'file'
         }]);
       }
     } catch (error) {
@@ -172,7 +174,9 @@ function AppContent() {
       yAxis: firstNumeric?.name || columns[1]?.name || '',
       chartType: 'bar',
       normalized: false,
-      title: `Chart ${configs.length + 1}`
+      title: `Chart ${configs.length + 1}`,
+      xOrder: 'file',
+      yOrder: 'file'
     };
     setConfigs([...configs, newConfig]);
   };
@@ -220,7 +224,7 @@ function AppContent() {
     };
   }, [data]);
 
-  // Chart rendering logic with enhanced props
+  // Chart rendering logic with enhanced props and sorting
   const renderChart = (config: ChartConfig, isFullscreen = false) => {
     const width = isFullscreen ? '100%' : (config.width === undefined ? '100%' : (config.width === 0 ? '100%' : config.width));
     const height = isFullscreen ? 600 : (config.height === undefined ? 350 : config.height);
@@ -228,8 +232,32 @@ function AppContent() {
     // Calculate data ranges for this specific chart
     const dataRanges = calculateDataRanges(config);
     
+    // Apply sorting based on config
+    let sortedData = [...data];
+    if (config.xOrder && config.xOrder !== 'file') {
+      sortedData.sort((a, b) => {
+        const aVal = a[config.xAxis];
+        const bVal = b[config.xAxis];
+        if (aVal === undefined || bVal === undefined) return 0;
+        if (config.xOrder === 'ascending') return aVal > bVal ? 1 : aVal < bVal ? -1 : 0;
+        if (config.xOrder === 'descending') return aVal < bVal ? 1 : aVal > bVal ? -1 : 0;
+        return 0;
+      });
+    }
+    if (config.yOrder && config.yOrder !== 'file') {
+      const yKey = Array.isArray(config.yAxis) ? config.yAxis[0] : config.yAxis;
+      sortedData.sort((a, b) => {
+        const aVal = a[yKey];
+        const bVal = b[yKey];
+        if (aVal === undefined || bVal === undefined) return 0;
+        if (config.yOrder === 'ascending') return aVal > bVal ? 1 : aVal < bVal ? -1 : 0;
+        if (config.yOrder === 'descending') return aVal < bVal ? 1 : aVal > bVal ? -1 : 0;
+        return 0;
+      });
+    }
+    
     const commonProps = {
-      data,
+      data: sortedData,
       xAxis: config.xAxis,
       yAxis: config.yAxis,
       normalized: config.normalized,
@@ -343,7 +371,9 @@ function AppContent() {
         normalized: false,
         title: 'Orderflow Heatmap',
         width: 800,
-        height: 500
+        height: 500,
+        xOrder: 'file',
+        yOrder: 'file'
       }
     ]);
   };

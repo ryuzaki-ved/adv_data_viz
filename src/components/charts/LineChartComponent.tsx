@@ -436,72 +436,43 @@ export const LineChartComponent: React.FC<LineChartComponentProps> = ({
     }
   }, []);
 
-  // Professional tooltip with enhanced styling and trend analysis
-  const CustomTooltip = ({ active, payload, label }: any) => {
-    if (active && payload && payload.length) {
+  // Compact tooltip that follows cursor
+  const CustomTooltip = ({ active, payload, label, coordinate }: any) => {
+    if (active && payload && payload.length && coordinate) {
       return (
-        <div className={`p-5 rounded-2xl shadow-2xl border backdrop-blur-lg transition-all duration-300 transform scale-105 ${
-          theme === 'dark' 
-            ? 'bg-gray-900/95 border-gray-600 text-white shadow-gray-900/50' 
-            : theme === 'accent'
-            ? 'bg-white/95 border-violet-200 text-gray-900 shadow-violet-500/20'
-            : 'bg-white/95 border-gray-200 text-gray-900 shadow-gray-500/20'
-        }`}>
-          <div className="flex items-center space-x-3 mb-4 pb-3 border-b border-gray-200 dark:border-gray-700">
-            <div className={`p-2 rounded-lg ${
-              theme === 'dark' ? 'bg-blue-500/20' : theme === 'accent' ? 'bg-violet-100' : 'bg-blue-50'
-            }`}>
-              <Activity className={`h-5 w-5 ${
-                theme === 'dark' ? 'text-blue-400' : theme === 'accent' ? 'text-violet-600' : 'text-blue-600'
-              }`} />
-            </div>
-            <div>
-              <p className="font-bold text-lg">{`${xAxis}`}</p>
-              <p className={`text-sm ${
-                theme === 'dark' ? 'text-gray-400' : theme === 'accent' ? 'text-violet-600' : 'text-gray-600'
-              }`}>
-                {typeof label === 'number' ? label.toLocaleString(undefined, {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2
-                }) : label}
-              </p>
-            </div>
+        <div 
+          className={`fixed z-50 px-3 py-2 rounded-lg shadow-xl border text-xs font-medium pointer-events-none transition-all duration-200 ${
+            theme === 'dark' 
+              ? 'bg-gray-900/95 border-gray-600 text-white' 
+              : theme === 'accent'
+              ? 'bg-white/95 border-violet-200 text-gray-900'
+              : 'bg-white/95 border-gray-200 text-gray-900'
+          }`}
+          style={{
+            left: coordinate.x + 10,
+            top: coordinate.y - 10,
+            transform: 'translate(0, -100%)'
+          }}
+        >
+          <div className="flex items-center space-x-2 mb-1">
+            <Activity className="h-3 w-3 text-blue-500" />
+            <span className="font-semibold">{`${xAxis}: ${typeof label === 'number' ? label.toFixed(2) : label}`}</span>
           </div>
-          <div className="space-y-3">
-            {payload.map((entry: any, index: number) => {
-              const prevValue = index > 0 ? payload[index - 1].value : entry.value;
-              const trend = entry.value > prevValue ? '↗' : entry.value < prevValue ? '↘' : '→';
-              const trendColor = entry.value > prevValue ? 'text-green-500' : entry.value < prevValue ? 'text-red-500' : 'text-gray-500';
-              
-              return (
-                <div key={index} className="flex items-center justify-between space-x-6 p-3 rounded-xl bg-gray-50 dark:bg-gray-800/50">
-                  <div className="flex items-center space-x-3">
-                    <div 
-                      className="w-4 h-4 rounded-full shadow-lg"
-                      style={{ backgroundColor: entry.color }}
-                    />
-                    <div>
-                      <span className="text-sm font-semibold">{entry.name}</span>
-                      <div className="flex items-center space-x-2 mt-1">
-                        <span className={`text-lg font-bold ${trendColor}`}>{trend}</span>
-                        <span className="text-xs text-gray-500 dark:text-gray-400">trend</span>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-lg font-bold">
-                      {typeof entry.value === 'number' ? entry.value.toLocaleString(undefined, {
-                        minimumFractionDigits: 3,
-                        maximumFractionDigits: 3
-                      }) : entry.value}
-                    </span>
-                    <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                      {entry.payload.originalIndex && `Point ${entry.payload.originalIndex + 1}`}
-                    </div>
-                  </div>
+          <div className="space-y-1">
+            {payload.map((entry: any, index: number) => (
+              <div key={index} className="flex items-center justify-between space-x-3">
+                <div className="flex items-center space-x-1">
+                  <div 
+                    className="w-2 h-2 rounded-full"
+                    style={{ backgroundColor: entry.color }}
+                  />
+                  <span className="text-xs">{entry.name}</span>
                 </div>
-              );
-            })}
+                <span className="text-xs font-bold">
+                  {typeof entry.value === 'number' ? entry.value.toFixed(3) : entry.value}
+                </span>
+              </div>
+            ))}
           </div>
         </div>
       );
