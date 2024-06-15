@@ -1,6 +1,6 @@
 import React, { useState, useRef, useCallback, useMemo } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Brush, ReferenceLine, Legend, Area, ComposedChart } from 'recharts';
-import { ZoomIn, ZoomOut, RotateCcw, Move, Download, TrendingUp, Activity, Eye, EyeOff } from 'lucide-react';
+import { ZoomIn, ZoomOut, RotateCcw, Move, Download, TrendingUp, Activity, Eye, EyeOff, Zap, ZapOff } from 'lucide-react';
 import { DataPoint } from '../../types';
 import { useTheme } from '../../contexts/ThemeContext';
 
@@ -29,6 +29,7 @@ export const LineChartComponent: React.FC<LineChartComponentProps> = ({
   const [showArea, setShowArea] = useState(false);
   const [visibleLines, setVisibleLines] = useState<Set<string>>(new Set());
   const [hoveredPoint, setHoveredPoint] = useState<any>(null);
+  const [enableOptimization, setEnableOptimization] = useState(data.length > 2000);
   const chartRef = useRef<any>(null);
   
   const yKeys = Array.isArray(yAxis) ? yAxis : [yAxis];
@@ -60,9 +61,9 @@ export const LineChartComponent: React.FC<LineChartComponentProps> = ({
   const currentColors = colorSystem[theme];
   const showRightAxis = yKeys.length > 1;
 
-  // Advanced data optimization with trend analysis
+  // Advanced data optimization with trend analysis - now optional
   const optimizedData = useMemo(() => {
-    if (data.length <= 2000) return data;
+    if (!enableOptimization || data.length <= 2000) return data;
     
     // Implement Douglas-Peucker algorithm for line simplification
     const douglasPeucker = (points: DataPoint[], epsilon: number): DataPoint[] => {
@@ -133,57 +134,79 @@ export const LineChartComponent: React.FC<LineChartComponentProps> = ({
     const epsilon = yRange * 0.001; // 0.1% of range
     
     return douglasPeucker(data, epsilon).slice(0, 2000);
-  }, [data, xAxis, yKeys]);
+  }, [data, xAxis, yKeys, enableOptimization]);
 
-  // Enhanced data ranges with statistical analysis
+  // Enhanced data ranges with statistical analysis and separate Y-axis ranges
   const dataRanges = useMemo(() => {
     const xValues = optimizedData.map(d => {
       const val = d[xAxis];
       return typeof val === 'number' ? val : parseFloat(String(val));
     }).filter(v => !isNaN(v));
 
-    const yValues = yKeys.flatMap(key => 
-      optimizedData.map(d => {
+    // Calculate separate ranges for each Y-axis
+    const yRanges = yKeys.map(key => {
+      const yValues = optimizedData.map(d => {
         const val = normalized ? d[`${key}_normalized`] : d[key];
         return typeof val === 'number' ? val : parseFloat(String(val));
-      }).filter(v => !isNaN(v))
-    );
+      }).filter(v => !isNaN(v));
 
-    const xRange = xValues.length > 0 ? {
+      return yValues.length > 0 ? {
+        min: Math.min(...yValues),
+        max: Math.max(...yValues),
+        mean: yValues.reduce((a, b) => a + b, 0) / yValues.length,
+        std: 0
+      } : { min: 0, max: 100, mean: 50, std: 0 };
+    });
+
+    const xStats = xValues.length > 0 ? {
       min: Math.min(...xValues),
       max: Math.max(...xValues),
-      mean: xValues.reduce((a, b) => a + b, 0) / xValues.length
-    } : { min: 0, max: 100, mean: 50 };
+      mean: xValues.reduce((a, b) => a + b, 0) / xValues.length,
+      std: 0
+    } : { min: 0, max: 100, mean: 50, std: 0 };
+    
+    // Calculate standard deviation for each Y range
+    yRanges.forEach(yRange => {
+      if (yRange.min !== 0 || yRange.max !== 100) {
+        const yValues = optimizedData.map(d => {
+          const val = normalized ? d[`${yKeys[yRanges.indexOf(yRange)]}_normalized`] : d[yKeys[yRanges.indexOf(yRange)]];
+          return typeof val === 'number' ? val : parseFloat(String(val));
+        }).filter(v => !isNaN(v));
+        
+        yRange.std = Math.sqrt(yValues.reduce((sum, y) => sum + Math.pow(y - yRange.mean, 2), 0) / yValues.length);
+      }
+    });
+    
+    // Calculate standard deviation for X
+    xStats.std = Math.sqrt(xValues.reduce((sum, x) => sum + Math.pow(x - xStats.mean, 2), 0) / xValues.length);
 
-    const yRange = yValues.length > 0 ? {
-      min: Math.min(...yValues),
-      max: Math.max(...yValues),
-      mean: yValues.reduce((a, b) => a + b, 0) / yValues.length
-    } : { min: 0, max: 100, mean: 50 };
-
-    // Adaptive padding based on data variance
-    const xPadding = (xRange.max - xRange.min) * 0.02;
-    const yPadding = (yRange.max - yRange.min) * 0.05;
+    // Adaptive padding based on standard deviation
+    const xPadding = xStats.std * 0.1;
 
     return {
       x: {
-        min: xRange.min - xPadding,
-        max: xRange.max + xPadding,
-        dataMin: xRange.min,
-        dataMax: xRange.max,
-        mean: xRange.mean
+        min: xStats.min - xPadding,
+        max: xStats.max + xPadding,
+        dataMin: xStats.min,
+        dataMax: xStats.max,
+        mean: xStats.mean,
+        std: xStats.std
       },
-      y: {
-        min: yRange.min - yPadding,
-        max: yRange.max + yPadding,
-        dataMin: yRange.min,
-        dataMax: yRange.max,
-        mean: yRange.mean
-      }
+      y: yRanges.map(yRange => {
+        const yPadding = yRange.std * 0.1;
+        return {
+          min: yRange.min - yPadding,
+          max: yRange.max + yPadding,
+          dataMin: yRange.min,
+          dataMax: yRange.max,
+          mean: yRange.mean,
+          std: yRange.std
+        };
+      })
     };
   }, [optimizedData, xAxis, yKeys, normalized]);
 
-  // Enhanced domain calculations
+  // Enhanced domain calculations with separate Y-axis domains
   const getXDomain = useCallback(() => {
     if (zoomDomain.left !== undefined && zoomDomain.right !== undefined) {
       return [zoomDomain.left, zoomDomain.right];
@@ -196,13 +219,14 @@ export const LineChartComponent: React.FC<LineChartComponentProps> = ({
     return [dataRanges.x.min, dataRanges.x.max];
   }, [zoomDomain, xMin, xMax, dataRanges]);
 
-  const getYDomain = useCallback(() => {
+  const getYDomain = useCallback((axisIndex: number = 0) => {
+    const yRange = dataRanges.y[axisIndex] || dataRanges.y[0];
     if (yMin !== undefined || yMax !== undefined) {
-      const min = yMin !== undefined ? yMin : dataRanges.y.min;
-      const max = yMax !== undefined ? yMax : dataRanges.y.max;
+      const min = yMin !== undefined ? yMin : yRange.min;
+      const max = yMax !== undefined ? yMax : yRange.max;
       return [min, max];
     }
-    return [dataRanges.y.min, dataRanges.y.max];
+    return [yRange.min, yRange.max];
   }, [yMin, yMax, dataRanges]);
 
   // Smooth zoom controls
@@ -406,6 +430,17 @@ export const LineChartComponent: React.FC<LineChartComponentProps> = ({
           <TrendingUp className="h-4 w-4" />
         </button>
         <button
+          onClick={() => setEnableOptimization(!enableOptimization)}
+          className={`p-2 rounded-lg transition-all duration-200 hover:scale-110 ${
+            enableOptimization 
+              ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-600 dark:text-yellow-400' 
+              : 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400'
+          }`}
+          title={enableOptimization ? "Disable Optimization" : "Enable Optimization"}
+        >
+          {enableOptimization ? <Zap className="h-4 w-4" /> : <ZapOff className="h-4 w-4" />}
+        </button>
+        <button
           onClick={handleExport}
           className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-all duration-200 hover:scale-110"
           title="Export Chart"
@@ -453,7 +488,7 @@ export const LineChartComponent: React.FC<LineChartComponentProps> = ({
               position: 'insideLeft', 
               style: { textAnchor: 'middle', fontSize: 12, fontWeight: 600 }
             } : undefined}
-            domain={getYDomain()}
+            domain={getYDomain(0)}
             tick={{ fontSize: 11, fontWeight: 500 }}
             tickFormatter={(value) => value.toLocaleString()}
           />
@@ -472,7 +507,7 @@ export const LineChartComponent: React.FC<LineChartComponentProps> = ({
                 position: 'insideRight', 
                 style: { textAnchor: 'middle', fontSize: 12, fontWeight: 600 }
               } : undefined}
-              domain={getYDomain()}
+              domain={getYDomain(1)}
               tick={{ fontSize: 11, fontWeight: 500 }}
               tickFormatter={(value) => value.toLocaleString()}
             />
@@ -489,15 +524,18 @@ export const LineChartComponent: React.FC<LineChartComponentProps> = ({
             )}
           />
           
-          {/* Reference line for mean */}
-          <ReferenceLine 
-            yAxisId="left"
-            y={dataRanges.y.mean} 
-            stroke={theme === 'dark' ? '#6B7280' : '#9CA3AF'} 
-            strokeDasharray="5 5" 
-            strokeWidth={1}
-            opacity={0.6}
-          />
+          {/* Reference lines for means - separate for each Y-axis */}
+          {dataRanges.y.map((yRange, index) => (
+            <ReferenceLine 
+              key={`mean-${index}`}
+              yAxisId={index === 1 && showRightAxis ? "right" : "left"}
+              y={yRange.mean} 
+              stroke={theme === 'dark' ? '#6B7280' : '#9CA3AF'} 
+              strokeDasharray="5 5" 
+              strokeWidth={1}
+              opacity={0.6}
+            />
+          ))}
           
           {/* Enhanced lines with areas */}
           {yKeys.map((key, index) => {
@@ -594,8 +632,8 @@ export const LineChartComponent: React.FC<LineChartComponentProps> = ({
           })}
         </div>
         
-        {optimizedData.length < data.length && (
-          <div className="text-xs text-gray-500 dark:text-gray-400 bg-yellow-50 dark:bg-yellow-900/20 px-3 py-2 rounded-lg">
+        {enableOptimization && optimizedData.length < data.length && (
+          <div className="text-xs text-yellow-600 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-900/20 px-3 py-2 rounded-lg">
             Optimized: {optimizedData.length.toLocaleString()} of {data.length.toLocaleString()} points
           </div>
         )}

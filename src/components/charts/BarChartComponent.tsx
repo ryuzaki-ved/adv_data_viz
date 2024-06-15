@@ -1,6 +1,6 @@
 import React, { useState, useRef, useCallback, useMemo } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Brush, ReferenceLine, Legend, Cell } from 'recharts';
-import { ZoomIn, ZoomOut, RotateCcw, Move, Download, Maximize2, Settings, TrendingUp } from 'lucide-react';
+import { ZoomIn, ZoomOut, RotateCcw, Move, Download, Maximize2, Settings, TrendingUp, Zap, ZapOff } from 'lucide-react';
 import { DataPoint } from '../../types';
 import { useTheme } from '../../contexts/ThemeContext';
 
@@ -28,6 +28,7 @@ export const BarChartComponent: React.FC<BarChartComponentProps> = ({
   const [showAnimation, setShowAnimation] = useState(true);
   const [hoveredBar, setHoveredBar] = useState<string | null>(null);
   const [selectedBars, setSelectedBars] = useState<Set<string>>(new Set());
+  const [enableOptimization, setEnableOptimization] = useState(data.length > 1000);
   const chartRef = useRef<any>(null);
   
   const yKeys = Array.isArray(yAxis) ? yAxis : [yAxis];
@@ -69,9 +70,9 @@ export const BarChartComponent: React.FC<BarChartComponentProps> = ({
   const currentPalette = colorPalettes[theme];
   const showRightAxis = yKeys.length > 1;
 
-  // Intelligent data optimization with trend preservation
+  // Intelligent data optimization with trend preservation - now optional
   const optimizedData = useMemo(() => {
-    if (data.length <= 1000) return data;
+    if (!enableOptimization || data.length <= 1000) return data;
     
     // Advanced sampling that preserves peaks and trends
     const sampleSize = 1000;
@@ -111,35 +112,35 @@ export const BarChartComponent: React.FC<BarChartComponentProps> = ({
     
     sampled.push(data[data.length - 1]);
     return sampled.slice(0, sampleSize);
-  }, [data, yKeys]);
+  }, [data, yKeys, enableOptimization]);
 
-  // Enhanced data ranges calculation
+  // Enhanced data ranges calculation with separate Y-axis ranges
   const dataRanges = useMemo(() => {
     const xValues = optimizedData.map(d => {
       const val = d[xAxis];
       return typeof val === 'number' ? val : parseFloat(String(val));
     }).filter(v => !isNaN(v));
 
-    const yValues = yKeys.flatMap(key => 
-      optimizedData.map(d => {
+    // Calculate separate ranges for each Y-axis
+    const yRanges = yKeys.map(key => {
+      const yValues = optimizedData.map(d => {
         const val = normalized ? d[`${key}_normalized`] : d[key];
         return typeof val === 'number' ? val : parseFloat(String(val));
-      }).filter(v => !isNaN(v))
-    );
+      }).filter(v => !isNaN(v));
+
+      return yValues.length > 0 ? {
+        min: Math.min(...yValues),
+        max: Math.max(...yValues)
+      } : { min: 0, max: 100 };
+    });
 
     const xRange = xValues.length > 0 ? {
       min: Math.min(...xValues),
       max: Math.max(...xValues)
     } : { min: 0, max: 100 };
 
-    const yRange = yValues.length > 0 ? {
-      min: Math.min(...yValues),
-      max: Math.max(...yValues)
-    } : { min: 0, max: 100 };
-
     // Smart padding based on data distribution
     const xPadding = (xRange.max - xRange.min) * 0.05;
-    const yPadding = (yRange.max - yRange.min) * 0.1;
 
     return {
       x: {
@@ -148,16 +149,19 @@ export const BarChartComponent: React.FC<BarChartComponentProps> = ({
         dataMin: xRange.min,
         dataMax: xRange.max
       },
-      y: {
-        min: Math.max(0, yRange.min - yPadding), // Don't go below 0 for bars
-        max: yRange.max + yPadding,
-        dataMin: yRange.min,
-        dataMax: yRange.max
-      }
+      y: yRanges.map((yRange, index) => {
+        const yPadding = (yRange.max - yRange.min) * 0.1;
+        return {
+          min: Math.max(0, yRange.min - yPadding), // Don't go below 0 for bars
+          max: yRange.max + yPadding,
+          dataMin: yRange.min,
+          dataMax: yRange.max
+        };
+      })
     };
   }, [optimizedData, xAxis, yKeys, normalized]);
 
-  // Enhanced domain calculations
+  // Enhanced domain calculations with separate Y-axis domains
   const getXDomain = useCallback(() => {
     if (zoomDomain.left !== undefined && zoomDomain.right !== undefined) {
       return [zoomDomain.left, zoomDomain.right];
@@ -170,13 +174,14 @@ export const BarChartComponent: React.FC<BarChartComponentProps> = ({
     return [dataRanges.x.min, dataRanges.x.max];
   }, [zoomDomain, xMin, xMax, dataRanges]);
 
-  const getYDomain = useCallback(() => {
+  const getYDomain = useCallback((axisIndex: number = 0) => {
+    const yRange = dataRanges.y[axisIndex] || dataRanges.y[0];
     if (yMin !== undefined || yMax !== undefined) {
-      const min = yMin !== undefined ? yMin : dataRanges.y.min;
-      const max = yMax !== undefined ? yMax : dataRanges.y.max;
+      const min = yMin !== undefined ? yMin : yRange.min;
+      const max = yMax !== undefined ? yMax : yRange.max;
       return [min, max];
     }
-    return [dataRanges.y.min, dataRanges.y.max];
+    return [yRange.min, yRange.max];
   }, [yMin, yMax, dataRanges]);
 
   // Enhanced zoom controls with smooth animations
@@ -405,6 +410,17 @@ export const BarChartComponent: React.FC<BarChartComponentProps> = ({
           <Settings className="h-4 w-4" />
         </button>
         <button
+          onClick={() => setEnableOptimization(!enableOptimization)}
+          className={`p-2 rounded-lg transition-all duration-200 hover:scale-110 ${
+            enableOptimization 
+              ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-600 dark:text-yellow-400' 
+              : 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400'
+          }`}
+          title={enableOptimization ? "Disable Optimization" : "Enable Optimization"}
+        >
+          {enableOptimization ? <Zap className="h-4 w-4" /> : <ZapOff className="h-4 w-4" />}
+        </button>
+        <button
           onClick={handleExport}
           className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-all duration-200 hover:scale-110"
           title="Export Chart"
@@ -468,7 +484,7 @@ export const BarChartComponent: React.FC<BarChartComponentProps> = ({
               position: 'insideLeft', 
               style: { textAnchor: 'middle', fontSize: 12, fontWeight: 600 }
             } : undefined}
-            domain={getYDomain()}
+            domain={getYDomain(0)}
             tick={{ fontSize: 11, fontWeight: 500 }}
             tickFormatter={(value) => value.toLocaleString()}
           />
@@ -487,7 +503,7 @@ export const BarChartComponent: React.FC<BarChartComponentProps> = ({
                 position: 'insideRight', 
                 style: { textAnchor: 'middle', fontSize: 12, fontWeight: 600 }
               } : undefined}
-              domain={getYDomain()}
+              domain={getYDomain(1)}
               tick={{ fontSize: 11, fontWeight: 500 }}
               tickFormatter={(value) => value.toLocaleString()}
             />
@@ -544,9 +560,9 @@ export const BarChartComponent: React.FC<BarChartComponentProps> = ({
             </span>
           </div>
         ))}
-        {optimizedData.length < data.length && (
-          <div className="text-xs text-gray-500 dark:text-gray-400 bg-yellow-50 dark:bg-yellow-900/20 px-3 py-2 rounded-lg">
-            Showing {optimizedData.length.toLocaleString()} of {data.length.toLocaleString()} points
+        {enableOptimization && optimizedData.length < data.length && (
+          <div className="text-xs text-yellow-600 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-900/20 px-3 py-2 rounded-lg">
+            Optimized: {optimizedData.length.toLocaleString()} of {data.length.toLocaleString()} points
           </div>
         )}
         {selectedBars.size > 0 && (

@@ -1,6 +1,6 @@
 import React, { useState, useRef, useCallback, useMemo } from 'react';
 import { ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, Legend, Cell } from 'recharts';
-import { ZoomIn, ZoomOut, RotateCcw, Move, Download, Target, Filter, Layers } from 'lucide-react';
+import { ZoomIn, ZoomOut, RotateCcw, Move, Download, Target, Filter, Layers, Zap, ZapOff } from 'lucide-react';
 import { DataPoint } from '../../types';
 import { useTheme } from '../../contexts/ThemeContext';
 
@@ -28,6 +28,7 @@ export const ScatterChartComponent: React.FC<ScatterChartComponentProps> = ({
   const [brushSelection, setBrushSelection] = useState<any>(null);
   const [showDensity, setShowDensity] = useState(false);
   const [pointSize, setPointSize] = useState(4);
+  const [enableOptimization, setEnableOptimization] = useState(data.length > 3000);
   const chartRef = useRef<any>(null);
   
   const yKeys = Array.isArray(yAxis) ? yAxis.slice(0, 3) : [yAxis];
@@ -54,12 +55,12 @@ export const ScatterChartComponent: React.FC<ScatterChartComponentProps> = ({
   const currentColors = colorSystem[theme];
   const showRightAxis = yKeys.length > 1;
 
-  // Advanced data optimization with clustering for large datasets
+  // Advanced data optimization with clustering for large datasets - now optional
   const optimizedData = useMemo(() => {
-    if (data.length <= 3000) return data;
+    if (!enableOptimization || data.length <= 3000) return data;
     
     // Implement k-means clustering for point reduction
-    const clusterData = (points: DataPoint[], k: number = 2000): DataPoint[] => {
+    const clusterData = (points: DataPoint[], k: number = 3000): DataPoint[] => {
       if (points.length <= k) return points;
       
       // Simple grid-based clustering for performance
@@ -117,7 +118,7 @@ export const ScatterChartComponent: React.FC<ScatterChartComponentProps> = ({
     };
     
     return clusterData(data);
-  }, [data, xAxis, yKeys]);
+  }, [data, xAxis, yKeys, enableOptimization]);
 
   // For each yKey, create scatter data with enhanced properties
   const scatterDataArr = useMemo(() => {
@@ -139,32 +140,41 @@ export const ScatterChartComponent: React.FC<ScatterChartComponentProps> = ({
     );
   }, [optimizedData, xAxis, yKeys, normalized, selectedPoints, pointSize]);
 
-  // Enhanced data ranges with statistical analysis
+  // Enhanced data ranges with statistical analysis and separate Y-axis ranges
   const dataRanges = useMemo(() => {
     const allXValues = scatterDataArr.flat().map(d => d.x);
-    const allYValues = scatterDataArr.flat().map(d => d.y);
+    
+    // Calculate separate ranges for each Y-axis
+    const yRanges = yKeys.map((key, index) => {
+      const yValues = scatterDataArr[index]?.map(d => d.y) || [];
+      return yValues.length > 0 ? {
+        min: Math.min(...yValues),
+        max: Math.max(...yValues),
+        mean: yValues.reduce((a, b) => a + b, 0) / yValues.length,
+        std: 0
+      } : { min: 0, max: 100, mean: 50, std: 0 };
+    });
 
-    const xStats = {
+    const xStats = allXValues.length > 0 ? {
       min: Math.min(...allXValues),
       max: Math.max(...allXValues),
       mean: allXValues.reduce((a, b) => a + b, 0) / allXValues.length,
       std: 0
-    };
+    } : { min: 0, max: 100, mean: 50, std: 0 };
     
-    const yStats = {
-      min: Math.min(...allYValues),
-      max: Math.max(...allYValues),
-      mean: allYValues.reduce((a, b) => a + b, 0) / allYValues.length,
-      std: 0
-    };
+    // Calculate standard deviation for each Y range
+    yRanges.forEach((yRange, index) => {
+      if (yRange.min !== 0 || yRange.max !== 100) {
+        const yValues = scatterDataArr[index]?.map(d => d.y) || [];
+        yRange.std = Math.sqrt(yValues.reduce((sum, y) => sum + Math.pow(y - yRange.mean, 2), 0) / yValues.length);
+      }
+    });
     
-    // Calculate standard deviation
+    // Calculate standard deviation for X
     xStats.std = Math.sqrt(allXValues.reduce((sum, x) => sum + Math.pow(x - xStats.mean, 2), 0) / allXValues.length);
-    yStats.std = Math.sqrt(allYValues.reduce((sum, y) => sum + Math.pow(y - yStats.mean, 2), 0) / allYValues.length);
 
     // Smart padding based on standard deviation
     const xPadding = xStats.std * 0.1;
-    const yPadding = yStats.std * 0.1;
 
     return {
       x: {
@@ -175,18 +185,21 @@ export const ScatterChartComponent: React.FC<ScatterChartComponentProps> = ({
         mean: xStats.mean,
         std: xStats.std
       },
-      y: {
-        min: yStats.min - yPadding,
-        max: yStats.max + yPadding,
-        dataMin: yStats.min,
-        dataMax: yStats.max,
-        mean: yStats.mean,
-        std: yStats.std
-      }
+      y: yRanges.map(yRange => {
+        const yPadding = yRange.std * 0.1;
+        return {
+          min: yRange.min - yPadding,
+          max: yRange.max + yPadding,
+          dataMin: yRange.min,
+          dataMax: yRange.max,
+          mean: yRange.mean,
+          std: yRange.std
+        };
+      })
     };
-  }, [scatterDataArr]);
+  }, [scatterDataArr, yKeys]);
 
-  // Enhanced domain calculations
+  // Enhanced domain calculations with separate Y-axis domains
   const getXDomain = useCallback(() => {
     if (zoomDomain.x) {
       return zoomDomain.x;
@@ -199,22 +212,23 @@ export const ScatterChartComponent: React.FC<ScatterChartComponentProps> = ({
     return [dataRanges.x.min, dataRanges.x.max];
   }, [zoomDomain, xMin, xMax, dataRanges]);
 
-  const getYDomain = useCallback(() => {
+  const getYDomain = useCallback((axisIndex: number = 0) => {
     if (zoomDomain.y) {
       return zoomDomain.y;
     }
+    const yRange = dataRanges.y[axisIndex] || dataRanges.y[0];
     if (yMin !== undefined || yMax !== undefined) {
-      const min = yMin !== undefined ? yMin : dataRanges.y.min;
-      const max = yMax !== undefined ? yMax : dataRanges.y.max;
+      const min = yMin !== undefined ? yMin : yRange.min;
+      const max = yMax !== undefined ? yMax : yRange.max;
       return [min, max];
     }
-    return [dataRanges.y.min, dataRanges.y.max];
+    return [yRange.min, yRange.max];
   }, [zoomDomain, yMin, yMax, dataRanges]);
 
   // Enhanced zoom controls
   const handleZoomIn = useCallback(() => {
     const currentXDomain = zoomDomain.x || [dataRanges.x.min, dataRanges.x.max];
-    const currentYDomain = zoomDomain.y || [dataRanges.y.min, dataRanges.y.max];
+    const currentYDomain = zoomDomain.y || [dataRanges.y[0].min, dataRanges.y[0].max];
     
     const xCenter = (currentXDomain[0] + currentXDomain[1]) / 2;
     const yCenter = (currentYDomain[0] + currentYDomain[1]) / 2;
@@ -229,12 +243,12 @@ export const ScatterChartComponent: React.FC<ScatterChartComponentProps> = ({
 
   const handleZoomOut = useCallback(() => {
     const currentXDomain = zoomDomain.x || [dataRanges.x.min, dataRanges.x.max];
-    const currentYDomain = zoomDomain.y || [dataRanges.y.min, dataRanges.y.max];
+    const currentYDomain = zoomDomain.y || [dataRanges.y[0].min, dataRanges.y[0].max];
     
     const xCenter = (currentXDomain[0] + currentXDomain[1]) / 2;
     const yCenter = (currentYDomain[0] + currentYDomain[1]) / 2;
     const xRange = Math.min((currentXDomain[1] - currentXDomain[0]) * 1.8, dataRanges.x.max - dataRanges.x.min);
-    const yRange = Math.min((currentYDomain[1] - currentYDomain[0]) * 1.8, dataRanges.y.max - dataRanges.y.min);
+    const yRange = Math.min((currentYDomain[1] - currentYDomain[0]) * 1.8, dataRanges.y[0].max - dataRanges.y[0].min);
     
     setZoomDomain({
       x: [
@@ -242,8 +256,8 @@ export const ScatterChartComponent: React.FC<ScatterChartComponentProps> = ({
         Math.min(dataRanges.x.max, xCenter + xRange / 2)
       ],
       y: [
-        Math.max(dataRanges.y.min, yCenter - yRange / 2), 
-        Math.min(dataRanges.y.max, yCenter + yRange / 2)
+        Math.max(dataRanges.y[0].min, yCenter - yRange / 2), 
+        Math.min(dataRanges.y[0].max, yCenter + yRange / 2)
       ]
     });
   }, [zoomDomain, dataRanges]);
@@ -399,6 +413,17 @@ export const ScatterChartComponent: React.FC<ScatterChartComponentProps> = ({
           <Filter className="h-4 w-4" />
         </button>
         <button
+          onClick={() => setEnableOptimization(!enableOptimization)}
+          className={`p-2 rounded-lg transition-all duration-200 hover:scale-110 ${
+            enableOptimization 
+              ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-600 dark:text-yellow-400' 
+              : 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400'
+          }`}
+          title={enableOptimization ? "Disable Optimization" : "Enable Optimization"}
+        >
+          {enableOptimization ? <Zap className="h-4 w-4" /> : <ZapOff className="h-4 w-4" />}
+        </button>
+        <button
           onClick={handleExport}
           className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-all duration-200 hover:scale-110"
           title="Export Chart"
@@ -464,7 +489,7 @@ export const ScatterChartComponent: React.FC<ScatterChartComponentProps> = ({
               position: 'insideLeft', 
               style: { textAnchor: 'middle', fontSize: 12, fontWeight: 600 }
             } : undefined}
-            domain={getYDomain()}
+            domain={getYDomain(0)}
             tick={{ fontSize: 11, fontWeight: 500 }}
             tickFormatter={(value) => value.toLocaleString()}
           />
@@ -485,7 +510,7 @@ export const ScatterChartComponent: React.FC<ScatterChartComponentProps> = ({
                 position: 'insideRight', 
                 style: { textAnchor: 'middle', fontSize: 12, fontWeight: 600 }
               } : undefined}
-              domain={getYDomain()}
+              domain={getYDomain(1)}
               tick={{ fontSize: 11, fontWeight: 500 }}
               tickFormatter={(value) => value.toLocaleString()}
             />
@@ -502,7 +527,7 @@ export const ScatterChartComponent: React.FC<ScatterChartComponentProps> = ({
             )}
           />
           
-          {/* Reference lines for means */}
+          {/* Reference lines for means - separate for each axis */}
           <ReferenceLine 
             x={dataRanges.x.mean} 
             stroke={theme === 'dark' ? '#6B7280' : '#9CA3AF'} 
@@ -510,14 +535,17 @@ export const ScatterChartComponent: React.FC<ScatterChartComponentProps> = ({
             strokeWidth={1}
             opacity={0.6}
           />
-          <ReferenceLine 
-            yAxisId="left"
-            y={dataRanges.y.mean} 
-            stroke={theme === 'dark' ? '#6B7280' : '#9CA3AF'} 
-            strokeDasharray="5 5" 
-            strokeWidth={1}
-            opacity={0.6}
-          />
+          {dataRanges.y.map((yRange, index) => (
+            <ReferenceLine 
+              key={`y-mean-${index}`}
+              yAxisId={index === 1 && showRightAxis ? "right" : "left"}
+              y={yRange.mean} 
+              stroke={theme === 'dark' ? '#6B7280' : '#9CA3AF'} 
+              strokeDasharray="5 5" 
+              strokeWidth={1}
+              opacity={0.6}
+            />
+          ))}
           
           {/* Enhanced scatter plots */}
           {yKeys.map((key, index) => (
@@ -551,8 +579,8 @@ export const ScatterChartComponent: React.FC<ScatterChartComponentProps> = ({
           ))}
         </div>
         
-        {optimizedData.length < data.length && (
-          <div className="text-xs text-gray-500 dark:text-gray-400 bg-yellow-50 dark:bg-yellow-900/20 px-3 py-2 rounded-lg">
+        {enableOptimization && optimizedData.length < data.length && (
+          <div className="text-xs text-yellow-600 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-900/20 px-3 py-2 rounded-lg">
             Clustered: {optimizedData.length.toLocaleString()} of {data.length.toLocaleString()} points
           </div>
         )}
