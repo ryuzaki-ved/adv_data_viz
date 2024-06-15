@@ -256,43 +256,28 @@ export const ChartControlSingle: React.FC<{
     onUpdate({ yAxis: newY.length === 1 ? newY[0] : newY });
   };
 
-  // Calculate data ranges for axis controls
-  const calculateDataRanges = React.useMemo(() => {
-    // This would ideally come from the data, but for now we'll use sensible defaults
-    // In a real implementation, you'd pass the actual data to calculate these ranges
-    return {
-      xMin: 0,
-      xMax: 100,
-      yMin: 0,
-      yMax: 100
-    };
-  }, []);
-
   // Defaults and min/max from config or fallback
   const minW = config.minW ?? 200, maxW = config.maxW ?? 1000, minH = config.minH ?? 200, maxH = config.maxH ?? 700;
   const width = config.width ?? 0; // 0 means 100%
   const height = config.height ?? 350;
-  
-  // Auto-fit logic: set width to 100%, height to 50 + N*10 (clamped)
-  const handleAutoFit = () => {
-    const autoHeight = Math.max(minH, Math.min(maxH, 50 + (config.dataLength ?? 30) * 10));
-    onUpdate({ width: 0, height: autoHeight });
-  };
-
-  // Axis min/max controls as sliders
   const xMin = config.xMin;
   const xMax = config.xMax;
   const yMin = config.yMin;
   const yMax = config.yMax;
-  
-  // For slider ranges, use calculated data min/max or sensible defaults
-  const xDataMin = calculateDataRanges.xMin;
-  const xDataMax = calculateDataRanges.xMax;
-  const yDataMin = calculateDataRanges.yMin;
-  const yDataMax = calculateDataRanges.yMax;
+  // For slider ranges, use static sensible defaults
+  const xDataMin = 0;
+  const xDataMax = 100;
+  const yDataMin = 0;
+  const yDataMax = 100;
   
   const handleResetAxes = () => {
     onUpdate({ xMin: undefined, xMax: undefined, yMin: undefined, yMax: undefined });
+  };
+
+  // Auto-fit logic: set width to 100%, height to 50 + N*10 (clamped)
+  const handleAutoFit = () => {
+    const autoHeight = Math.max(minH, Math.min(maxH, 50 + (config.dataLength ?? 30) * 10));
+    onUpdate({ width: 0, height: autoHeight });
   };
 
   return (

@@ -530,6 +530,7 @@ export const ScatterChartComponent: React.FC<ScatterChartComponentProps> = ({
           {/* Reference lines for means - separate for each axis */}
           <ReferenceLine 
             x={dataRanges.x.mean} 
+            yAxisId="left"
             stroke={theme === 'dark' ? '#6B7280' : '#9CA3AF'} 
             strokeDasharray="5 5" 
             strokeWidth={1}

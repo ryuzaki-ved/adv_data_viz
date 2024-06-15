@@ -525,6 +525,14 @@ export const LineChartComponent: React.FC<LineChartComponentProps> = ({
           />
           
           {/* Reference lines for means - separate for each Y-axis */}
+          <ReferenceLine 
+            x={dataRanges.x.mean}
+            yAxisId="left"
+            stroke={theme === 'dark' ? '#6B7280' : '#9CA3AF'} 
+            strokeDasharray="5 5" 
+            strokeWidth={1}
+            opacity={0.6}
+          />
           {dataRanges.y.map((yRange, index) => (
             <ReferenceLine 
               key={`mean-${index}`}
