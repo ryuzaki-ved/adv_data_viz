@@ -617,8 +617,8 @@ export const LineChartComponent: React.FC<LineChartComponentProps> = ({
                 />
               )}
               
-              <XAxis 
-                dataKey={xAxis} 
+        <XAxis 
+          dataKey={xAxis} 
                 stroke={currentColors.axis}
                 fontSize={13}
                 fontWeight={500}
@@ -671,7 +671,7 @@ export const LineChartComponent: React.FC<LineChartComponentProps> = ({
               />
               
               {showRightAxis && (
-                <YAxis 
+        <YAxis 
                   yAxisId="right"
                   orientation="right"
                   stroke={currentColors.axis}
@@ -781,7 +781,7 @@ export const LineChartComponent: React.FC<LineChartComponentProps> = ({
                       />
                     )}
                     {isVisible && (
-                      <Line 
+        <Line 
                         type={lineStyle === 'step' ? 'stepAfter' : lineStyle === 'linear' ? 'linear' : 'monotone'}
                         dataKey={normalized ? `${key}_normalized` : key}
                         stroke={lineColor}
@@ -827,7 +827,7 @@ export const LineChartComponent: React.FC<LineChartComponentProps> = ({
                 />
               )}
             </ComposedChart>
-          </ResponsiveContainer>
+    </ResponsiveContainer>
         </div>
       </div>
 

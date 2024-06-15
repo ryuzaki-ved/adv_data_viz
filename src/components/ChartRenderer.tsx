@@ -6,15 +6,18 @@ import { PieChartComponent } from './charts/PieChartComponent';
 import { ScatterChartComponent } from './charts/ScatterChartComponent';
 import { HeatmapComponent } from './charts/HeatmapComponent';
 import { FootprintComponent } from './charts/FootprintComponent';
+import { OrderflowChartComponent } from './charts/OrderflowChartComponent';
+import { OrderflowHeatmapChartComponent } from './charts/OrderflowHeatmapChartComponent';
 import { useTheme } from '../contexts/ThemeContext';
 
 interface ChartRendererProps {
   data: DataPoint[];
   configs: ChartConfig[];
   columns: ColumnInfo[];
+  globalAxisOrder?: boolean;
 }
 
-export const ChartRenderer: React.FC<ChartRendererProps> = ({ data, configs, columns }) => {
+export const ChartRenderer: React.FC<ChartRendererProps> = ({ data, configs, columns, globalAxisOrder }) => {
   const { theme } = useTheme();
 
   const getThemeClasses = () => {
@@ -28,9 +31,41 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data, configs, col
     }
   };
 
+  // Sorting utility (same as in AppContent)
+  function sortData(data: DataPoint[], xAxis: string, xOrder: string, yAxis: string, yOrder: string) {
+    let sorted = [...data];
+    if (xOrder && xOrder !== 'file') {
+      sorted.sort((a, b) => {
+        const aVal = a[xAxis];
+        const bVal = b[xAxis];
+        if (aVal === undefined || bVal === undefined) return 0;
+        if (xOrder === 'ascending') return aVal > bVal ? 1 : aVal < bVal ? -1 : 0;
+        if (xOrder === 'descending') return aVal < bVal ? 1 : aVal > bVal ? -1 : 0;
+        return 0;
+      });
+    }
+    if (yOrder && yOrder !== 'file') {
+      sorted.sort((a, b) => {
+        const aVal = a[yAxis];
+        const bVal = b[yAxis];
+        if (aVal === undefined || bVal === undefined) return 0;
+        if (yOrder === 'ascending') return aVal > bVal ? 1 : aVal < bVal ? -1 : 0;
+        if (yOrder === 'descending') return aVal < bVal ? 1 : aVal > bVal ? -1 : 0;
+        return 0;
+      });
+    }
+    return sorted;
+  }
+
   const renderChart = (config: ChartConfig) => {
+    let chartData = data;
+    if (!globalAxisOrder) {
+      const xOrder = config.xOrder || 'file';
+      const yOrder = config.yOrder || 'file';
+      chartData = sortData(data, config.xAxis, xOrder, Array.isArray(config.yAxis) ? config.yAxis[0] : config.yAxis, yOrder);
+    }
     const commonProps = {
-      data,
+      data: chartData,
       xAxis: config.xAxis,
       yAxis: Array.isArray(config.yAxis) ? config.yAxis[0] : config.yAxis,
       normalized: config.normalized
@@ -49,6 +84,10 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data, configs, col
         return <HeatmapComponent {...commonProps} />;
       case 'footprint':
         return <FootprintComponent {...commonProps} />;
+      case 'orderflow':
+        return <OrderflowChartComponent data={data} width={config.width || '100%'} height={config.height || 600} theme={theme} />;
+      case 'orderflow-heatmap':
+        return <OrderflowHeatmapChartComponent orderbook={window.__MOCK_ORDERBOOK__ || []} trades={window.__MOCK_TRADES__ || []} width={config.width || 800} height={config.height || 500} theme={theme} />;
       default:
         return <BarChartComponent {...commonProps} />;
     }

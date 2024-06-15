@@ -12,6 +12,9 @@ interface ChartControlsProps {
 export const ChartControls: React.FC<ChartControlsProps> = ({ columns, configs, onConfigsChange }) => {
   const { theme } = useTheme();
 
+  // Global axis order scope state
+  const [globalAxisOrder, setGlobalAxisOrder] = React.useState(false);
+
   const chartTypes: { key: ChartType; icon: React.ReactNode; label: string }[] = [
     { key: 'bar', icon: <BarChart3 className="h-4 w-4" />, label: 'Bar' },
     { key: 'line', icon: <LineChart className="h-4 w-4" />, label: 'Line' },
@@ -85,6 +88,22 @@ export const ChartControls: React.FC<ChartControlsProps> = ({ columns, configs, 
 
   return (
     <div className="space-y-6">
+      {/* Global axis order scope control */}
+      <div className="flex items-center mb-2">
+        <input
+          type="checkbox"
+          id="global-axis-order"
+          checked={globalAxisOrder}
+          onChange={e => {
+            setGlobalAxisOrder(e.target.checked);
+            onConfigsChange([{ __globalSort__: e.target.checked }, ...configs]);
+          }}
+          className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 mr-2"
+        />
+        <label htmlFor="global-axis-order" className="text-sm font-medium cursor-pointer text-gray-700 dark:text-gray-300">
+          Apply axis order to all charts
+        </label>
+      </div>
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Chart Configuration</h3>
         <button
@@ -153,6 +172,17 @@ export const ChartControls: React.FC<ChartControlsProps> = ({ columns, configs, 
                     </option>
                   ))}
                 </select>
+                {/* X-Axis Order */}
+                <label className={`block text-xs font-medium mt-1 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>X-Axis Order</label>
+                <select
+                  value={config.xOrder || 'file'}
+                  onChange={e => updateConfig(config.id, { xOrder: e.target.value })}
+                  className={`w-full p-2 rounded border text-xs ${themeClasses.input} focus:ring-1 focus:ring-blue-500 focus:border-blue-500`}
+                >
+                  <option value="file">As in file</option>
+                  <option value="ascending">Ascending</option>
+                  <option value="descending">Descending</option>
+                </select>
               </div>
 
               <div>
@@ -167,6 +197,17 @@ export const ChartControls: React.FC<ChartControlsProps> = ({ columns, configs, 
                       {column.name}
                     </option>
                   ))}
+                </select>
+                {/* Y-Axis Order */}
+                <label className={`block text-xs font-medium mt-1 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>Y-Axis Order</label>
+                <select
+                  value={config.yOrder || 'file'}
+                  onChange={e => updateConfig(config.id, { yOrder: e.target.value })}
+                  className={`w-full p-2 rounded border text-xs ${themeClasses.input} focus:ring-1 focus:ring-blue-500 focus:border-blue-500`}
+                >
+                  <option value="file">As in file</option>
+                  <option value="ascending">Ascending</option>
+                  <option value="descending">Descending</option>
                 </select>
               </div>
             </div>

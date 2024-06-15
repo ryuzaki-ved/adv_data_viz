@@ -16,6 +16,40 @@ import { HeatmapComponent } from './components/charts/HeatmapComponent';
 import { FootprintComponent } from './components/charts/FootprintComponent';
 import { DataFilterComponent } from './components/DataFilterComponent';
 
+// Mock orderbook and trades for Bookmap-style heatmap
+function generateMockOrderbookAndTrades() {
+  const priceStart = 100;
+  const priceStep = 0.25;
+  const priceLevels = 40;
+  const timeSteps = 120;
+  const now = Date.now();
+  const orderbook = [];
+  for (let t = 0; t < timeSteps; t++) {
+    const time = now + t * 1000;
+    const levels = [];
+    for (let p = 0; p < priceLevels; p++) {
+      const price = priceStart + p * priceStep;
+      // Simulate liquidity waves
+      const base = 50 + 40 * Math.sin((p + t / 10) / 3) + 30 * Math.cos((t + p) / 7);
+      const size = Math.max(1, Math.floor(base + 20 * Math.random()));
+      levels.push({ price, size, side: p < priceLevels / 2 ? 'bid' : 'ask' });
+    }
+    orderbook.push({ time, levels });
+  }
+  // Trades: random bubbles along the price/time grid
+  const trades = [];
+  for (let i = 0; i < 120; i++) {
+    const tIdx = Math.floor(Math.random() * timeSteps);
+    const pIdx = Math.floor(Math.random() * priceLevels);
+    const price = priceStart + pIdx * priceStep;
+    const time = now + tIdx * 1000;
+    const size = Math.floor(1 + Math.random() * 30);
+    const side = Math.random() > 0.5 ? 'buy' : 'sell';
+    trades.push({ time, price, size, side });
+  }
+  return { orderbook, trades };
+}
+
 function AppContent() {
   const [data, setData] = useState<DataPoint[]>([]);
   const [originalData, setOriginalData] = useState<DataPoint[]>([]);
@@ -27,6 +61,7 @@ function AppContent() {
   const [showColumnDetails, setShowColumnDetails] = useState(false);
   const [controlsCollapsed, setControlsCollapsed] = useState<Record<string, boolean>>({});
   const [dataFilters, setDataFilters] = useState<DataFilter[]>([]);
+  const [globalAxisOrder, setGlobalAxisOrder] = useState(false);
   const { theme } = useTheme ? useTheme() : { theme: 'light' };
 
   const handleFileUpload = async (file: File) => {
@@ -292,6 +327,70 @@ function AppContent() {
       </div>
     </div>
   );
+
+  // Add Orderflow Heatmap chart with mock data
+  const addOrderflowHeatmapChart = () => {
+    const { orderbook, trades } = generateMockOrderbookAndTrades();
+    window.__MOCK_ORDERBOOK__ = orderbook;
+    window.__MOCK_TRADES__ = trades;
+    setConfigs(configs => [
+      ...configs,
+      {
+        id: `chart-${Date.now()}`,
+        xAxis: 'price',
+        yAxis: 'size',
+        chartType: 'orderflow-heatmap',
+        normalized: false,
+        title: 'Orderflow Heatmap',
+        width: 800,
+        height: 500
+      }
+    ]);
+  };
+
+  // Handle configs change from ChartControls (including global sort)
+  const handleConfigsChange = (newConfigs: any[]) => {
+    if (newConfigs[0] && newConfigs[0].__globalSort__ !== undefined) {
+      setGlobalAxisOrder(newConfigs[0].__globalSort__);
+      setConfigs(newConfigs.slice(1));
+    } else {
+      setConfigs(newConfigs);
+    }
+  };
+
+  // Sorting utility
+  function sortData(data: DataPoint[], xAxis: string, xOrder: string, yAxis: string, yOrder: string) {
+    let sorted = [...data];
+    if (xOrder && xOrder !== 'file') {
+      sorted.sort((a, b) => {
+        const aVal = a[xAxis];
+        const bVal = b[xAxis];
+        if (aVal === undefined || bVal === undefined) return 0;
+        if (xOrder === 'ascending') return aVal > bVal ? 1 : aVal < bVal ? -1 : 0;
+        if (xOrder === 'descending') return aVal < bVal ? 1 : aVal > bVal ? -1 : 0;
+        return 0;
+      });
+    }
+    if (yOrder && yOrder !== 'file') {
+      sorted.sort((a, b) => {
+        const aVal = a[yAxis];
+        const bVal = b[yAxis];
+        if (aVal === undefined || bVal === undefined) return 0;
+        if (yOrder === 'ascending') return aVal > bVal ? 1 : aVal < bVal ? -1 : 0;
+        if (yOrder === 'descending') return aVal < bVal ? 1 : aVal > bVal ? -1 : 0;
+        return 0;
+      });
+    }
+    return sorted;
+  }
+
+  // Prepare data for ChartRenderer
+  let dataForCharts = data;
+  if (globalAxisOrder && configs.length > 0) {
+    // Use the first chart's axis order as the global order
+    const { xAxis, xOrder = 'file', yAxis, yOrder = 'file' } = configs[0];
+    dataForCharts = sortData(data, xAxis, xOrder, yAxis, yOrder);
+  }
 
   return (
     <div className="min-h-screen transition-colors duration-300">

@@ -40,7 +40,33 @@ export interface DataFilter {
   value: number;
 }
 
-export type ChartType = 'bar' | 'line' | 'pie' | 'scatter' | 'heatmap' | 'footprint';
+export interface OrderflowDataPoint {
+  price: number;
+  bidVolume: number;
+  askVolume: number;
+  delta?: number; // askVolume - bidVolume
+  time?: string; // optional, for time-based orderflow
+}
+
+export interface OrderbookLevel {
+  price: number;
+  size: number;
+  side: 'bid' | 'ask';
+}
+
+export interface OrderbookSnapshot {
+  time: number; // ms or ISO string
+  levels: OrderbookLevel[]; // sorted by price
+}
+
+export interface TradePrint {
+  time: number;
+  price: number;
+  size: number;
+  side: 'buy' | 'sell';
+}
+
+export type ChartType = 'bar' | 'line' | 'pie' | 'scatter' | 'heatmap' | 'footprint' | 'orderflow';
 
 export type Theme = 'light' | 'dark' | 'accent';
 

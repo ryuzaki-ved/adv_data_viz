@@ -462,10 +462,10 @@ export const ScatterChartComponent: React.FC<ScatterChartComponentProps> = ({
             />
           )}
           
-          <XAxis 
-            type="number" 
-            dataKey="x" 
-            name={xAxis}
+        <XAxis 
+          type="number" 
+          dataKey="x" 
+          name={xAxis}
             stroke={theme === 'dark' ? '#9CA3AF' : '#6B7280'}
             fontSize={12}
             tickLine={false}
@@ -481,7 +481,7 @@ export const ScatterChartComponent: React.FC<ScatterChartComponentProps> = ({
             dataKey="y" 
             stroke={theme === 'dark' ? '#9CA3AF' : '#6B7280'}
             fontSize={12}
-            tickLine={false}
+          tickLine={false}
             axisLine={{ stroke: theme === 'dark' ? '#4B5563' : '#D1D5DB', strokeWidth: 1 }}
             label={yKeys[0] ? { 
               value: yKeys[0], 
@@ -495,14 +495,14 @@ export const ScatterChartComponent: React.FC<ScatterChartComponentProps> = ({
           />
           
           {showRightAxis && (
-            <YAxis 
+        <YAxis 
               yAxisId="right"
               orientation="right"
-              type="number"
-              dataKey="y"
+          type="number" 
+          dataKey="y" 
               stroke={theme === 'dark' ? '#9CA3AF' : '#6B7280'}
               fontSize={12}
-              tickLine={false}
+          tickLine={false}
               axisLine={{ stroke: theme === 'dark' ? '#4B5563' : '#D1D5DB', strokeWidth: 1 }}
               label={yKeys[1] ? { 
                 value: yKeys[1], 
@@ -550,7 +550,7 @@ export const ScatterChartComponent: React.FC<ScatterChartComponentProps> = ({
           
           {/* Enhanced scatter plots */}
           {yKeys.map((key, index) => (
-            <Scatter 
+        <Scatter 
               key={key}
               data={scatterDataArr[index]} 
               fill={currentColors.primary[index % currentColors.primary.length]}
@@ -561,8 +561,8 @@ export const ScatterChartComponent: React.FC<ScatterChartComponentProps> = ({
               animationDuration={showAnimation ? 1000 : 0}
             />
           ))}
-        </ScatterChart>
-      </ResponsiveContainer>
+      </ScatterChart>
+    </ResponsiveContainer>
       
       {/* Enhanced legend with statistics */}
       <div className="flex flex-wrap justify-center items-center space-x-4 mt-4">

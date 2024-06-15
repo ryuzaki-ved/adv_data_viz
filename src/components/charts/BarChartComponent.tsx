@@ -460,8 +460,8 @@ export const BarChartComponent: React.FC<BarChartComponentProps> = ({
             />
           )}
           
-          <XAxis 
-            dataKey={xAxis} 
+        <XAxis 
+          dataKey={xAxis} 
             stroke={theme === 'dark' ? '#9CA3AF' : '#6B7280'}
             fontSize={12}
             tickLine={false}
@@ -476,7 +476,7 @@ export const BarChartComponent: React.FC<BarChartComponentProps> = ({
             yAxisId="left"
             stroke={theme === 'dark' ? '#9CA3AF' : '#6B7280'}
             fontSize={12}
-            tickLine={false}
+          tickLine={false}
             axisLine={{ stroke: theme === 'dark' ? '#4B5563' : '#D1D5DB', strokeWidth: 1 }}
             label={yKeys[0] ? { 
               value: yKeys[0], 
@@ -490,12 +490,12 @@ export const BarChartComponent: React.FC<BarChartComponentProps> = ({
           />
           
           {showRightAxis && (
-            <YAxis 
+        <YAxis 
               yAxisId="right"
               orientation="right"
               stroke={theme === 'dark' ? '#9CA3AF' : '#6B7280'}
               fontSize={12}
-              tickLine={false}
+          tickLine={false}
               axisLine={{ stroke: theme === 'dark' ? '#4B5563' : '#D1D5DB', strokeWidth: 1 }}
               label={yKeys[1] ? { 
                 value: yKeys[1], 
@@ -544,8 +544,8 @@ export const BarChartComponent: React.FC<BarChartComponentProps> = ({
               tickFormatter={(value) => String(value).substring(0, 10)}
             />
           )}
-        </BarChart>
-      </ResponsiveContainer>
+      </BarChart>
+    </ResponsiveContainer>
       
       {/* Enhanced legend with statistics */}
       <div className="flex flex-wrap justify-center items-center space-x-6 mt-4 text-xs">
