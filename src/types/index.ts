@@ -24,6 +24,23 @@ export interface ChartConfig {
   yDataMin?: number;
   yDataMax?: number;
   dataLength?: number;
+  xOrder?: string;
+  yOrder?: string;
+  // New multi-chart properties
+  isMultiChart?: boolean;
+  chartCombinations?: ChartCombination[];
+}
+
+export interface ChartCombination {
+  id: string;
+  column: string;
+  chartType: ChartType;
+  yAxisId: 'left' | 'right';
+  color?: string;
+  strokeWidth?: number;
+  opacity?: number;
+  visible?: boolean;
+  normalized?: boolean;
 }
 
 export interface FileInfo {
@@ -66,7 +83,7 @@ export interface TradePrint {
   side: 'buy' | 'sell';
 }
 
-export type ChartType = 'bar' | 'line' | 'pie' | 'scatter' | 'heatmap' | 'footprint' | 'orderflow';
+export type ChartType = 'bar' | 'line' | 'pie' | 'scatter' | 'heatmap' | 'footprint' | 'orderflow' | 'area' | 'step';
 
 export type Theme = 'light' | 'dark' | 'accent';
 

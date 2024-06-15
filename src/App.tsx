@@ -6,7 +6,7 @@ import { ThemeSelector } from './components/ThemeSelector';
 import { ChartControls } from './components/ChartControls';
 import { ChartRenderer } from './components/ChartRenderer';
 import { parseCSV, normalizeData } from './utils/csvParser';
-import { DataPoint, ColumnInfo, ChartConfig, FileInfo, DataFilter } from './types';
+import { DataPoint, ColumnInfo, ChartConfig, FileInfo, DataFilter, ChartCombination } from './types';
 import { ChartControlSingle } from './components/ChartControls';
 import { BarChartComponent } from './components/charts/BarChartComponent';
 import { LineChartComponent } from './components/charts/LineChartComponent';
@@ -14,6 +14,8 @@ import { PieChartComponent } from './components/charts/PieChartComponent';
 import { ScatterChartComponent } from './components/charts/ScatterChartComponent';
 import { HeatmapComponent } from './components/charts/HeatmapComponent';
 import { FootprintComponent } from './components/charts/FootprintComponent';
+import { ComboChartComponent } from './components/charts/ComboChartComponent';
+import { OrderflowChartComponent } from './components/charts/OrderflowChartComponent';
 import { DataFilterComponent } from './components/DataFilterComponent';
 
 // Mock orderbook and trades for Bookmap-style heatmap
@@ -269,6 +271,41 @@ function AppContent() {
       yMax: config.yMax,
       ...dataRanges
     };
+
+    // Handle multi-chart (combo) rendering
+    if (config.isMultiChart && config.chartCombinations) {
+      return (
+        <ComboChartComponent
+          data={sortedData}
+          xAxis={config.xAxis}
+          combinations={config.chartCombinations}
+          onCombinationsChange={(combinations) => updateConfig(config.id, { chartCombinations: combinations })}
+          normalized={config.normalized}
+          width={width}
+          height={height}
+          xMin={config.xMin}
+          xMax={config.xMax}
+          yMin={config.yMin}
+          yMax={config.yMax}
+          availableColumns={numericColumns.map(col => col.name)}
+        />
+      );
+    }
+
+    // Handle orderflow chart rendering
+    if (config.chartType === 'orderflow') {
+      // Get mock data from global storage or generate new
+      const mockData = (window as any).__MOCK_ORDERFLOW_DATA__ || [];
+      
+      return (
+        <OrderflowChartComponent
+          data={mockData}
+          width={width}
+          height={height}
+          theme={theme}
+        />
+      );
+    }
     
     switch (config.chartType) {
       case 'bar':
@@ -339,7 +376,7 @@ function AppContent() {
           </h2>
           <div className="flex items-center space-x-3">
             <div className="text-sm text-gray-600 dark:text-gray-400">
-              {config.xAxis} vs {Array.isArray(config.yAxis) ? config.yAxis.join(', ') : config.yAxis}
+              {config.isMultiChart ? 'Multi-Chart Combination' : `${config.xAxis} vs ${Array.isArray(config.yAxis) ? config.yAxis.join(', ') : config.yAxis}`}
             </div>
             <button
               onClick={() => setFullscreenChart(null)}
@@ -441,7 +478,7 @@ function AppContent() {
                     CSV Data Visualizer
                   </h1>
                   <p className="text-sm text-gray-600 dark:text-gray-400">
-                    Transform your data into beautiful insights
+                    Transform your data into beautiful insights with multi-chart combinations and orderflow analysis
                   </p>
                 </div>
               </div>
@@ -460,7 +497,7 @@ function AppContent() {
                   Get Started with Your Data
                 </h2>
                 <p className="text-gray-600 dark:text-gray-400">
-                  Upload a CSV file to create beautiful, interactive visualizations
+                  Upload a CSV file to create beautiful, interactive visualizations with multi-chart combinations and orderflow analysis
                 </p>
               </div>
               <FileUploader onFileUpload={handleFileUpload} isLoading={isLoading} />
@@ -607,8 +644,18 @@ function AppContent() {
                       <div key={config.id} className="bg-gray-50 dark:bg-gray-900/50 rounded-xl p-6 border border-gray-200 dark:border-gray-700 transition-all duration-200 hover:shadow-lg">
                         {/* Chart Controls Header with Collapse Toggle */}
                         <div className="flex justify-between items-center mb-4">
-                          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                            Chart Controls - {config.title || `Chart ${idx + 1}`}
+                          <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center space-x-2">
+                            <span>Chart Controls - {config.title || `Chart ${idx + 1}`}</span>
+                            {config.isMultiChart && (
+                              <span className="px-2 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 text-xs rounded-full font-medium">
+                                COMBO
+                              </span>
+                            )}
+                            {config.chartType === 'orderflow' && (
+                              <span className="px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 text-xs rounded-full font-medium">
+                                ORDERFLOW
+                              </span>
+                            )}
                           </h3>
                           <button
                             onClick={() => toggleControlsCollapse(config.id)}
@@ -641,12 +688,27 @@ function AppContent() {
                         {/* Chart Display */}
                         <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
                           <div className="flex justify-between items-center mb-4">
-                            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                              {config.title || `Chart ${idx + 1}`}
+                            <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center space-x-2">
+                              <span>{config.title || `Chart ${idx + 1}`}</span>
+                              {config.isMultiChart && (
+                                <span className="px-2 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 text-xs rounded-full font-medium">
+                                  COMBO
+                                </span>
+                              )}
+                              {config.chartType === 'orderflow' && (
+                                <span className="px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 text-xs rounded-full font-medium">
+                                  ORDERFLOW
+                                </span>
+                              )}
                             </h3>
                             <div className="flex items-center space-x-3">
                               <div className="text-sm text-gray-600 dark:text-gray-400">
-                                {config.xAxis} vs {Array.isArray(config.yAxis) ? config.yAxis.join(', ') : config.yAxis}
+                                {config.isMultiChart 
+                                  ? 'Multi-Chart Combination' 
+                                  : config.chartType === 'orderflow'
+                                  ? 'Professional Orderflow Analysis'
+                                  : `${config.xAxis} vs ${Array.isArray(config.yAxis) ? config.yAxis.join(', ') : config.yAxis}`
+                                }
                               </div>
                               <button
                                 onClick={() => setFullscreenChart(config.id)}
