@@ -18,7 +18,7 @@ interface ScatterChartComponentProps {
 }
 
 export const ScatterChartComponent: React.FC<ScatterChartComponentProps> = ({ 
-  data, xAxis, yAxis, normalized, width = '100%', height = 350, xMin, xMax, yMin, yMax 
+  data, xAxis, yAxis, normalized, width = '100%', height = 450, xMin, xMax, yMin, yMax 
 }) => {
   const { theme } = useTheme();
   const [zoomDomain, setZoomDomain] = useState<{ x?: [number, number]; y?: [number, number] }>({});
@@ -29,7 +29,10 @@ export const ScatterChartComponent: React.FC<ScatterChartComponentProps> = ({
   const [showDensity, setShowDensity] = useState(false);
   const [pointSize, setPointSize] = useState(4);
   const [enableOptimization, setEnableOptimization] = useState(data.length > 3000);
+  const [hoveredData, setHoveredData] = useState<any>(null);
+  const [mousePosition, setMousePosition] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const chartRef = useRef<any>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   
   const yKeys = Array.isArray(yAxis) ? yAxis.slice(0, 3) : [yAxis];
   
@@ -281,6 +284,24 @@ export const ScatterChartComponent: React.FC<ScatterChartComponentProps> = ({
     setSelectedPoints(newSelected);
   }, [selectedPoints]);
 
+  // Handle mouse events for data point info
+  const handleMouseEnter = useCallback((data: any, event?: any) => {
+    setHoveredData(data);
+    
+    // Track mouse position for floating card
+    if (event && containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect();
+      setMousePosition({
+        x: event.clientX - rect.left,
+        y: event.clientY - rect.top
+      });
+    }
+  }, []);
+
+  const handleMouseLeave = useCallback(() => {
+    setHoveredData(null);
+  }, []);
+
   // Export functionality
   const handleExport = useCallback(() => {
     if (chartRef.current) {
@@ -305,51 +326,6 @@ export const ScatterChartComponent: React.FC<ScatterChartComponentProps> = ({
     }
   }, []);
 
-  // Compact tooltip that follows cursor
-  const CustomTooltip = ({ active, payload, label, coordinate }: any) => {
-    if (active && payload && payload.length && coordinate) {
-      const data = payload[0].payload;
-      return (
-        <div 
-          className={`fixed z-50 px-3 py-2 rounded-lg shadow-xl border text-xs font-medium pointer-events-none transition-all duration-200 ${
-            theme === 'dark' 
-              ? 'bg-gray-900/95 border-gray-600 text-white' 
-              : 'bg-white/95 border-gray-200 text-gray-900'
-          }`}
-          style={{
-            left: coordinate.x + 10,
-            top: coordinate.y - 10,
-            transform: 'translate(0, -100%)'
-          }}
-        >
-          <div className="flex items-center space-x-2 mb-1">
-            <Target className="h-3 w-3 text-blue-500" />
-            <span className="font-semibold">Data Point</span>
-          </div>
-          <div className="space-y-1">
-            <div className="flex justify-between items-center">
-              <span className="text-xs">{xAxis}:</span>
-              <span className="text-xs font-bold">{data.x?.toFixed(3)}</span>
-            </div>
-            {payload.map((entry: any, index: number) => (
-              <div key={index} className="flex justify-between items-center">
-                <div className="flex items-center space-x-1">
-                  <div 
-                    className="w-2 h-2 rounded-full"
-                    style={{ backgroundColor: entry.color }}
-                  />
-                  <span className="text-xs">{entry.name}:</span>
-                </div>
-                <span className="text-xs font-bold">{entry.value?.toFixed(3)}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      );
-    }
-    return null;
-  };
-
   // Custom shapes for different series
   const CustomShape = ({ cx, cy, fill, payload, seriesIndex }: any) => {
     const shapes = [
@@ -365,6 +341,8 @@ export const ScatterChartComponent: React.FC<ScatterChartComponentProps> = ({
       <g 
         style={{ cursor: 'pointer', transition: 'all 0.2s ease-out' }}
         onClick={() => handlePointClick(payload)}
+        onMouseEnter={(e) => handleMouseEnter(payload, e)}
+        onMouseLeave={handleMouseLeave}
       >
         {shapes[seriesIndex % shapes.length]}
         {selectedPoints.has(payload.id) && (
@@ -383,196 +361,252 @@ export const ScatterChartComponent: React.FC<ScatterChartComponentProps> = ({
   };
 
   return (
-    <div className="relative group">
-      {/* Enhanced Chart Controls */}
-      <div className="absolute top-3 right-3 z-20 flex items-center space-x-1 bg-white/90 dark:bg-gray-800/90 backdrop-blur-md rounded-xl p-2 shadow-lg border border-gray-200/50 dark:border-gray-700/50 opacity-0 group-hover:opacity-100 transition-all duration-300">
-        <button
-          onClick={handleZoomIn}
-          className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-all duration-200 hover:scale-110"
-          title="Zoom In"
-        >
-          <ZoomIn className="h-4 w-4 text-gray-600 dark:text-gray-400" />
-        </button>
-        <button
-          onClick={handleZoomOut}
-          className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-all duration-200 hover:scale-110"
-          title="Zoom Out"
-        >
-          <ZoomOut className="h-4 w-4 text-gray-600 dark:text-gray-400" />
-        </button>
-        <button
-          onClick={handleResetZoom}
-          className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-all duration-200 hover:scale-110"
-          title="Reset View"
-        >
-          <RotateCcw className="h-4 w-4 text-gray-600 dark:text-gray-400" />
-        </button>
-        <div className="w-px h-6 bg-gray-300 dark:bg-gray-600" />
-        <button
-          onClick={() => setShowGrid(!showGrid)}
-          className={`p-2 rounded-lg transition-all duration-200 hover:scale-110 ${
-            showGrid 
-              ? 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400' 
-              : 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400'
-          }`}
-          title="Toggle Grid"
-        >
-          <Filter className="h-4 w-4" />
-        </button>
-        <button
-          onClick={() => setEnableOptimization(!enableOptimization)}
-          className={`p-2 rounded-lg transition-all duration-200 hover:scale-110 ${
-            enableOptimization 
-              ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-600 dark:text-yellow-400' 
-              : 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400'
-          }`}
-          title={enableOptimization ? "Disable Optimization" : "Enable Optimization"}
-        >
-          {enableOptimization ? <Zap className="h-4 w-4" /> : <ZapOff className="h-4 w-4" />}
-        </button>
-        <button
-          onClick={handleExport}
-          className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-all duration-200 hover:scale-110"
-          title="Export Chart"
-        >
-          <Download className="h-4 w-4 text-gray-600 dark:text-gray-400" />
-        </button>
-      </div>
-
-      {/* Point Size Control */}
-      <div className="absolute top-3 left-3 z-20 bg-white/90 dark:bg-gray-800/90 backdrop-blur-md rounded-xl p-3 shadow-lg border border-gray-200/50 dark:border-gray-700/50 opacity-0 group-hover:opacity-100 transition-all duration-300">
+    <div className="relative w-full" ref={containerRef}>
+      {/* Chart Controls - Moved outside chart area */}
+      <div className="flex justify-between items-center mb-6 px-2">
+        <div className="flex items-center space-x-3">
+          <button
+            onClick={() => setShowGrid(!showGrid)}
+            className={`px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+              showGrid 
+                ? 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400' 
+                : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
+            }`}
+            title="Toggle Grid"
+          >
+            <Filter className="h-4 w-4 mr-2 inline" />
+            Grid
+          </button>
+          
+          <button
+            onClick={() => setEnableOptimization(!enableOptimization)}
+            className={`px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+              enableOptimization 
+                ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-600 dark:text-yellow-400' 
+                : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
+            }`}
+            title={enableOptimization ? "Disable Optimization" : "Enable Optimization"}
+          >
+            {enableOptimization ? <Zap className="h-4 w-4 mr-2 inline" /> : <ZapOff className="h-4 w-4 mr-2 inline" />}
+            Optimize
+          </button>
+          
+          <div className="flex items-center space-x-2">
+            <Layers className="h-4 w-4 text-gray-600 dark:text-gray-400" />
+            <input
+              type="range"
+              min="2"
+              max="8"
+              value={pointSize}
+              onChange={(e) => setPointSize(Number(e.target.value))}
+              className="w-16"
+            />
+            <span className="text-xs text-gray-600 dark:text-gray-400">{pointSize}px</span>
+          </div>
+        </div>
+        
         <div className="flex items-center space-x-2">
-          <Layers className="h-4 w-4 text-gray-600 dark:text-gray-400" />
-          <input
-            type="range"
-            min="2"
-            max="8"
-            value={pointSize}
-            onChange={(e) => setPointSize(Number(e.target.value))}
-            className="w-16"
-          />
-          <span className="text-xs text-gray-600 dark:text-gray-400">{pointSize}px</span>
+          <button
+            onClick={handleZoomIn}
+            className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600 transition-all duration-200"
+            title="Zoom In"
+          >
+            <ZoomIn className="h-4 w-4" />
+          </button>
+          <button
+            onClick={handleZoomOut}
+            className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600 transition-all duration-200"
+            title="Zoom Out"
+          >
+            <ZoomOut className="h-4 w-4" />
+          </button>
+          <button
+            onClick={handleResetZoom}
+            className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600 transition-all duration-200"
+            title="Reset View"
+          >
+            <RotateCcw className="h-4 w-4" />
+          </button>
+          <button
+            onClick={handleExport}
+            className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600 transition-all duration-200"
+            title="Export Chart"
+          >
+            <Download className="h-4 w-4" />
+          </button>
         </div>
       </div>
 
-      <ResponsiveContainer width={width} height={height}>
-        <ScatterChart 
-          ref={chartRef}
-          margin={{ top: 20, right: 50, left: 20, bottom: 20 }}
-        >
-          {showGrid && (
-            <CartesianGrid 
-              strokeDasharray="2 4" 
-              stroke={theme === 'dark' ? '#374151' : '#E5E7EB'} 
-              strokeWidth={0.8}
-              opacity={0.5}
-            />
-          )}
-          
-        <XAxis 
-          type="number" 
-          dataKey="x" 
-          name={xAxis}
-            stroke={theme === 'dark' ? '#9CA3AF' : '#6B7280'}
-            fontSize={12}
-            tickLine={false}
-            axisLine={{ stroke: theme === 'dark' ? '#4B5563' : '#D1D5DB', strokeWidth: 1 }}
-            domain={getXDomain()}
-            tick={{ fontSize: 11, fontWeight: 500 }}
-            tickFormatter={(value) => value.toLocaleString()}
-          />
-          
-          <YAxis 
-            yAxisId="left"
+      {/* Chart Area - Fixed size to prevent resizing */}
+      <div className="w-full" style={{ height: height }}>
+        <ResponsiveContainer width="100%" height="100%">
+          <ScatterChart 
+            ref={chartRef}
+            margin={{ top: 20, right: 50, left: 20, bottom: 20 }}
+          >
+            {showGrid && (
+              <CartesianGrid 
+                strokeDasharray="2 4" 
+                stroke={theme === 'dark' ? '#374151' : '#E5E7EB'} 
+                strokeWidth={0.8}
+                opacity={0.5}
+              />
+            )}
+            
+          <XAxis 
             type="number" 
-            dataKey="y" 
-            stroke={theme === 'dark' ? '#9CA3AF' : '#6B7280'}
-            fontSize={12}
-          tickLine={false}
-            axisLine={{ stroke: theme === 'dark' ? '#4B5563' : '#D1D5DB', strokeWidth: 1 }}
-            label={yKeys[0] ? { 
-              value: yKeys[0], 
-              angle: -90, 
-              position: 'insideLeft', 
-              style: { textAnchor: 'middle', fontSize: 12, fontWeight: 600 }
-            } : undefined}
-            domain={getYDomain(0)}
-            tick={{ fontSize: 11, fontWeight: 500 }}
-            tickFormatter={(value) => value.toLocaleString()}
-          />
-          
-          {showRightAxis && (
-        <YAxis 
-              yAxisId="right"
-              orientation="right"
-          type="number" 
-          dataKey="y" 
+            dataKey="x" 
+            name={xAxis}
               stroke={theme === 'dark' ? '#9CA3AF' : '#6B7280'}
               fontSize={12}
-          tickLine={false}
+              tickLine={false}
               axisLine={{ stroke: theme === 'dark' ? '#4B5563' : '#D1D5DB', strokeWidth: 1 }}
-              label={yKeys[1] ? { 
-                value: yKeys[1], 
-                angle: 90, 
-                position: 'insideRight', 
-                style: { textAnchor: 'middle', fontSize: 12, fontWeight: 600 }
-              } : undefined}
-              domain={getYDomain(1)}
+              domain={getXDomain()}
               tick={{ fontSize: 11, fontWeight: 500 }}
               tickFormatter={(value) => value.toLocaleString()}
             />
-          )}
-          
-          <Tooltip content={<CustomTooltip />} cursor={{ strokeDasharray: '3 3' }} />
-          <Legend 
-            wrapperStyle={{ paddingTop: '20px' }}
-            iconType="circle"
-            formatter={(value, entry) => (
-              <span style={{ fontSize: 12, fontWeight: 500, color: entry.color }}>
-                {value}
-              </span>
+            
+            <YAxis 
+              yAxisId="left"
+              type="number" 
+              dataKey="y" 
+              stroke={theme === 'dark' ? '#9CA3AF' : '#6B7280'}
+              fontSize={12}
+            tickLine={false}
+              axisLine={{ stroke: theme === 'dark' ? '#4B5563' : '#D1D5DB', strokeWidth: 1 }}
+              label={yKeys[0] ? { 
+                value: yKeys[0], 
+                angle: -90, 
+                position: 'insideLeft', 
+                style: { textAnchor: 'middle', fontSize: 12, fontWeight: 600 }
+              } : undefined}
+              domain={getYDomain(0)}
+              tick={{ fontSize: 11, fontWeight: 500 }}
+              tickFormatter={(value) => value.toLocaleString()}
+            />
+            
+            {showRightAxis && (
+          <YAxis 
+                yAxisId="right"
+                orientation="right"
+            type="number" 
+            dataKey="y" 
+                stroke={theme === 'dark' ? '#9CA3AF' : '#6B7280'}
+                fontSize={12}
+            tickLine={false}
+                axisLine={{ stroke: theme === 'dark' ? '#4B5563' : '#D1D5DB', strokeWidth: 1 }}
+                label={yKeys[1] ? { 
+                  value: yKeys[1], 
+                  angle: 90, 
+                  position: 'insideRight', 
+                  style: { textAnchor: 'middle', fontSize: 12, fontWeight: 600 }
+                } : undefined}
+                domain={getYDomain(1)}
+                tick={{ fontSize: 11, fontWeight: 500 }}
+                tickFormatter={(value) => value.toLocaleString()}
+              />
             )}
-          />
-          
-          {/* Reference lines for means - separate for each axis */}
-          <ReferenceLine 
-            x={dataRanges.x.mean} 
-            yAxisId="left"
-            stroke={theme === 'dark' ? '#6B7280' : '#9CA3AF'} 
-            strokeDasharray="5 5" 
-            strokeWidth={1}
-            opacity={0.6}
-          />
-          {dataRanges.y.map((yRange, index) => (
+            
+            <Tooltip content={() => null} /> {/* Disable default tooltip */}
+            <Legend 
+              wrapperStyle={{ paddingTop: '20px' }}
+              iconType="circle"
+              formatter={(value, entry) => (
+                <span style={{ fontSize: 12, fontWeight: 500, color: entry.color }}>
+                  {value}
+                </span>
+              )}
+            />
+            
+            {/* Reference lines for means - separate for each axis */}
             <ReferenceLine 
-              key={`y-mean-${index}`}
-              yAxisId={index === 1 && showRightAxis ? "right" : "left"}
-              y={yRange.mean} 
+              x={dataRanges.x.mean} 
+              yAxisId="left"
               stroke={theme === 'dark' ? '#6B7280' : '#9CA3AF'} 
               strokeDasharray="5 5" 
               strokeWidth={1}
               opacity={0.6}
             />
-          ))}
+            {dataRanges.y.map((yRange, index) => (
+              <ReferenceLine 
+                key={`y-mean-${index}`}
+                yAxisId={index === 1 && showRightAxis ? "right" : "left"}
+                y={yRange.mean} 
+                stroke={theme === 'dark' ? '#6B7280' : '#9CA3AF'} 
+                strokeDasharray="5 5" 
+                strokeWidth={1}
+                opacity={0.6}
+              />
+            ))}
+            
+            {/* Enhanced scatter plots */}
+            {yKeys.map((key, index) => (
+          <Scatter 
+                key={key}
+                data={scatterDataArr[index]} 
+                fill={currentColors.primary[index % currentColors.primary.length]}
+                name={normalized ? `${key} (normalized)` : key}
+                yAxisId={index === 1 && showRightAxis ? "right" : "left"}
+                shape={<CustomShape seriesIndex={index} />}
+                animationBegin={showAnimation ? index * 300 : 0}
+                animationDuration={showAnimation ? 1000 : 0}
+              />
+            ))}
+        </ScatterChart>
+      </ResponsiveContainer>
+      </div>
+
+      {/* Minimalist Floating Data Point Card */}
+      {hoveredData && (
+        <div 
+          className={`absolute z-50 pointer-events-none transition-all duration-200 ${
+            theme === 'dark' 
+              ? 'bg-gray-900/95 border-gray-700 text-white' 
+              : 'bg-white/95 border-gray-200 text-gray-900'
+          } backdrop-blur-md rounded-lg border shadow-xl px-3 py-2 min-w-40`}
+          style={{
+            left: Math.min(mousePosition.x + 15, (containerRef.current?.offsetWidth || 0) - 180),
+            top: Math.max(mousePosition.y - 60, 10),
+            transform: 'translateZ(0)' // Force hardware acceleration
+          }}
+        >
+          <div className="space-y-1">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium text-gray-500 dark:text-gray-400">{xAxis}</span>
+              <span className="text-sm font-bold">{hoveredData.x?.toFixed(3)}</span>
+            </div>
+            
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
+                {normalized ? `${yKeys[hoveredData.seriesIndex]} (norm)` : yKeys[hoveredData.seriesIndex]}
+              </span>
+              <span 
+                className="text-sm font-bold"
+                style={{ color: currentColors.primary[hoveredData.seriesIndex % currentColors.primary.length] }}
+              >
+                {hoveredData.y?.toFixed(3)}
+              </span>
+            </div>
+          </div>
           
-          {/* Enhanced scatter plots */}
-          {yKeys.map((key, index) => (
-        <Scatter 
-              key={key}
-              data={scatterDataArr[index]} 
-              fill={currentColors.primary[index % currentColors.primary.length]}
-              name={normalized ? `${key} (normalized)` : key}
-              yAxisId={index === 1 && showRightAxis ? "right" : "left"}
-              shape={<CustomShape seriesIndex={index} />}
-              animationBegin={showAnimation ? index * 300 : 0}
-              animationDuration={showAnimation ? 1000 : 0}
-            />
-          ))}
-      </ScatterChart>
-    </ResponsiveContainer>
+          {/* Small arrow pointing to data point */}
+          <div 
+            className={`absolute w-2 h-2 transform rotate-45 ${
+              theme === 'dark' ? 'bg-gray-900' : 'bg-white'
+            } border-l border-b ${
+              theme === 'dark' ? 'border-gray-700' : 'border-gray-200'
+            }`}
+            style={{
+              left: -4,
+              top: '50%',
+              marginTop: -4
+            }}
+          />
+        </div>
+      )}
       
       {/* Enhanced legend with statistics */}
-      <div className="flex flex-wrap justify-center items-center space-x-4 mt-4">
+      <div className="flex flex-wrap justify-center items-center space-x-4 mt-6">
         <div className="flex flex-wrap items-center space-x-4">
           {yKeys.map((y, idx) => (
             <div key={y} className="flex items-center space-x-2 bg-gray-50 dark:bg-gray-800 px-3 py-2 rounded-lg">

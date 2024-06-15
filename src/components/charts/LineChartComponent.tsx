@@ -18,7 +18,7 @@ interface LineChartComponentProps {
 }
 
 export const LineChartComponent: React.FC<LineChartComponentProps> = ({ 
-  data, xAxis, yAxis, normalized, width = '100%', height = 350, xMin, xMax, yMin, yMax 
+  data, xAxis, yAxis, normalized, width = '100%', height = 500, xMin, xMax, yMin, yMax 
 }) => {
   const { theme } = useTheme();
   const [zoomDomain, setZoomDomain] = useState<{ left?: number; right?: number }>({});
@@ -33,9 +33,9 @@ export const LineChartComponent: React.FC<LineChartComponentProps> = ({
   const [lineStyle, setLineStyle] = useState<'smooth' | 'linear' | 'step'>('smooth');
   const [strokeWidth, setStrokeWidth] = useState(3);
   const [showDataPoints, setShowDataPoints] = useState(data.length <= 200);
-  const [controlsVisible, setControlsVisible] = useState(false);
+  const [hoveredData, setHoveredData] = useState<any>(null);
+  const [mousePosition, setMousePosition] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const chartRef = useRef<any>(null);
-  const controlsRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   
   const yKeys = Array.isArray(yAxis) ? yAxis : [yAxis];
@@ -44,35 +44,6 @@ export const LineChartComponent: React.FC<LineChartComponentProps> = ({
   React.useEffect(() => {
     setVisibleLines(new Set(yKeys));
   }, [yKeys]);
-
-  // Enhanced hover detection for controls
-  const handleMouseEnter = useCallback(() => {
-    setControlsVisible(true);
-  }, []);
-
-  const handleMouseLeave = useCallback((e: React.MouseEvent) => {
-    // Check if mouse is leaving to go to controls or completely outside
-    const containerRect = containerRef.current?.getBoundingClientRect();
-    const controlsRect = controlsRef.current?.getBoundingClientRect();
-    
-    if (containerRect && controlsRect) {
-      const { clientX, clientY } = e;
-      
-      // Create a combined bounding box that includes both chart and controls
-      const combinedRect = {
-        left: Math.min(containerRect.left, controlsRect.left) - 10,
-        right: Math.max(containerRect.right, controlsRect.right) + 10,
-        top: Math.min(containerRect.top, controlsRect.top) - 10,
-        bottom: Math.max(containerRect.bottom, controlsRect.bottom) + 10
-      };
-      
-      // Only hide if mouse is completely outside the combined area
-      if (clientX < combinedRect.left || clientX > combinedRect.right ||
-          clientY < combinedRect.top || clientY > combinedRect.bottom) {
-        setControlsVisible(false);
-      }
-    }
-  }, []);
 
   // Professional color system with enhanced gradients and accessibility
   const colorSystem = {
@@ -436,49 +407,21 @@ export const LineChartComponent: React.FC<LineChartComponentProps> = ({
     }
   }, []);
 
-  // Compact tooltip that follows cursor
-  const CustomTooltip = ({ active, payload, label, coordinate }: any) => {
-    if (active && payload && payload.length && coordinate) {
-      return (
-        <div 
-          className={`fixed z-50 px-3 py-2 rounded-lg shadow-xl border text-xs font-medium pointer-events-none transition-all duration-200 ${
-            theme === 'dark' 
-              ? 'bg-gray-900/95 border-gray-600 text-white' 
-              : theme === 'accent'
-              ? 'bg-white/95 border-violet-200 text-gray-900'
-              : 'bg-white/95 border-gray-200 text-gray-900'
-          }`}
-          style={{
-            left: coordinate.x + 10,
-            top: coordinate.y - 10,
-            transform: 'translate(0, -100%)'
-          }}
-        >
-          <div className="flex items-center space-x-2 mb-1">
-            <Activity className="h-3 w-3 text-blue-500" />
-            <span className="font-semibold">{`${xAxis}: ${typeof label === 'number' ? label.toFixed(2) : label}`}</span>
-          </div>
-          <div className="space-y-1">
-            {payload.map((entry: any, index: number) => (
-              <div key={index} className="flex items-center justify-between space-x-3">
-                <div className="flex items-center space-x-1">
-                  <div 
-                    className="w-2 h-2 rounded-full"
-                    style={{ backgroundColor: entry.color }}
-                  />
-                  <span className="text-xs">{entry.name}</span>
-                </div>
-                <span className="text-xs font-bold">
-                  {typeof entry.value === 'number' ? entry.value.toFixed(3) : entry.value}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      );
+  // Handle mouse events for data point info
+  const handleMouseMove = useCallback((event: any) => {
+    if (event && event.activePayload && event.activePayload.length > 0 && containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect();
+      setHoveredData(event.activePayload[0].payload);
+      setMousePosition({
+        x: event.activeCoordinate?.x || 0,
+        y: event.activeCoordinate?.y || 0
+      });
     }
-    return null;
-  };
+  }, []);
+
+  const handleMouseLeave = useCallback(() => {
+    setHoveredData(null);
+  }, []);
 
   // Enhanced custom dot with professional styling
   const CustomDot = (props: any) => {
@@ -538,90 +481,240 @@ export const LineChartComponent: React.FC<LineChartComponentProps> = ({
   const isXAxisNumeric = typeof optimizedData[0]?.[xAxis] === 'number';
 
   return (
-    <div className="relative w-full">
-      {/* Professional Chart Container with Enhanced Styling */}
-      <div 
-        ref={containerRef}
-        className={`relative rounded-2xl border-2 shadow-xl transition-all duration-500 ${
-          theme === 'dark' 
-            ? 'bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 border-gray-700 shadow-gray-900/50' 
-            : theme === 'accent'
-            ? 'bg-gradient-to-br from-white via-violet-50/30 to-white border-violet-200 shadow-violet-500/20'
-            : 'bg-gradient-to-br from-white via-blue-50/30 to-white border-gray-200 shadow-gray-500/20'
-        }`}
-        onMouseEnter={handleMouseEnter}
-        onMouseLeave={handleMouseLeave}
-      >
+    <div className="relative w-full" ref={containerRef}>
+      {/* Chart Controls - Moved outside chart area */}
+      <div className="flex justify-between items-center mb-6 px-2">
+        <div className="flex items-center space-x-3">
+          <button
+            onClick={() => setShowBrush(!showBrush)}
+            className={`px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+              showBrush 
+                ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' 
+                : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
+            }`}
+            title="Toggle Navigation"
+          >
+            <Move className="h-4 w-4 mr-2 inline" />
+            Navigation
+          </button>
+          
+          <button
+            onClick={() => setShowGrid(!showGrid)}
+            className={`px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+              showGrid 
+                ? 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400' 
+                : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
+            }`}
+            title="Toggle Grid"
+          >
+            <Grid3x3 className="h-4 w-4 mr-2 inline" />
+            Grid
+          </button>
+          
+          <button
+            onClick={() => setShowArea(!showArea)}
+            className={`px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+              showArea 
+                ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400' 
+                : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
+            }`}
+            title="Toggle Area Fill"
+          >
+            <TrendingUp className="h-4 w-4 mr-2 inline" />
+            Area
+          </button>
+          
+          <button
+            onClick={() => setShowDataPoints(!showDataPoints)}
+            className={`px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+              showDataPoints 
+                ? 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400' 
+                : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
+            }`}
+            title="Toggle Data Points"
+          >
+            <Layers className="h-4 w-4 mr-2 inline" />
+            Points
+          </button>
+          
+          <select
+            value={lineStyle}
+            onChange={(e) => setLineStyle(e.target.value as 'smooth' | 'linear' | 'step')}
+            className={`px-3 py-2 rounded-lg text-sm border ${
+              theme === 'dark' 
+                ? 'bg-gray-800 border-gray-600 text-white' 
+                : 'bg-white border-gray-300 text-gray-900'
+            }`}
+            title="Line Style"
+          >
+            <option value="smooth">Smooth</option>
+            <option value="linear">Linear</option>
+            <option value="step">Step</option>
+          </select>
+          
+          <div className="flex items-center space-x-2">
+            <label className="text-sm text-gray-600 dark:text-gray-400">Width:</label>
+            <input
+              type="range"
+              min="1"
+              max="6"
+              value={strokeWidth}
+              onChange={(e) => setStrokeWidth(Number(e.target.value))}
+              className="w-16"
+              title="Line Width"
+            />
+            <span className="text-xs text-gray-500 dark:text-gray-400">{strokeWidth}px</span>
+          </div>
+        </div>
         
-        {/* Chart Area */}
-        <div className="relative p-6">
-          <ResponsiveContainer width={width} height={height}>
-            <ComposedChart 
-              ref={chartRef}
-              data={optimizedData} 
-              margin={{ top: 30, right: 60, left: 30, bottom: showBrush ? 100 : 30 }}
-            >
-              <defs>
-                {/* Enhanced gradients for areas */}
-                {yKeys.map((key, index) => (
-                  <linearGradient key={`areaGradient-${key}`} id={`areaGradient-${key}`} x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor={currentColors.lines[index % currentColors.lines.length]} stopOpacity="0.3" />
-                    <stop offset="50%" stopColor={currentColors.lines[index % currentColors.lines.length]} stopOpacity="0.1" />
-                    <stop offset="100%" stopColor={currentColors.lines[index % currentColors.lines.length]} stopOpacity="0.05" />
-                  </linearGradient>
-                ))}
-                
-                {/* Professional grid pattern */}
-                <pattern id="gridPattern" patternUnits="userSpaceOnUse" width="20" height="20">
-                  <path d="M 20 0 L 0 0 0 20" fill="none" stroke={currentColors.grid} strokeWidth="0.5" opacity="0.3"/>
-                </pattern>
-              </defs>
+        <div className="flex items-center space-x-2">
+          <button
+            onClick={() => setEnableOptimization(!enableOptimization)}
+            className={`px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+              enableOptimization 
+                ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-600 dark:text-yellow-400' 
+                : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
+            }`}
+            title={enableOptimization ? "Disable Optimization" : "Enable Optimization"}
+          >
+            {enableOptimization ? <Zap className="h-4 w-4 mr-2 inline" /> : <ZapOff className="h-4 w-4 mr-2 inline" />}
+            Optimize
+          </button>
+          
+          <button
+            onClick={handleZoomIn}
+            className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600 transition-all duration-200"
+            title="Zoom In"
+          >
+            <ZoomIn className="h-4 w-4" />
+          </button>
+          <button
+            onClick={handleZoomOut}
+            className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600 transition-all duration-200"
+            title="Zoom Out"
+          >
+            <ZoomOut className="h-4 w-4" />
+          </button>
+          <button
+            onClick={handleResetZoom}
+            className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600 transition-all duration-200"
+            title="Reset View"
+          >
+            <RotateCcw className="h-4 w-4" />
+          </button>
+          <button
+            onClick={handleExport}
+            className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600 transition-all duration-200"
+            title="Export Chart"
+          >
+            <Download className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+
+      {/* Chart Area - Fixed size to prevent resizing */}
+      <div className="w-full" style={{ height: height }}>
+        <ResponsiveContainer width="100%" height="100%">
+          <ComposedChart 
+            ref={chartRef}
+            data={optimizedData} 
+            margin={{ top: 30, right: 60, left: 30, bottom: showBrush ? 100 : 30 }}
+            onMouseMove={handleMouseMove}
+            onMouseLeave={handleMouseLeave}
+          >
+            <defs>
+              {/* Enhanced gradients for areas */}
+              {yKeys.map((key, index) => (
+                <linearGradient key={`areaGradient-${key}`} id={`areaGradient-${key}`} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor={currentColors.lines[index % currentColors.lines.length]} stopOpacity="0.3" />
+                  <stop offset="50%" stopColor={currentColors.lines[index % currentColors.lines.length]} stopOpacity="0.1" />
+                  <stop offset="100%" stopColor={currentColors.lines[index % currentColors.lines.length]} stopOpacity="0.05" />
+                </linearGradient>
+              ))}
               
-              {showGrid && (
-                <CartesianGrid 
-                  strokeDasharray="1 3" 
-                  stroke={currentColors.grid} 
-                  strokeWidth={0.8}
-                  opacity={0.4}
-                  horizontal={true}
-                  vertical={true}
-                />
-              )}
-              
-        <XAxis 
-          dataKey={xAxis} 
-                stroke={currentColors.axis}
-                fontSize={13}
-                fontWeight={500}
-                tickLine={{ stroke: currentColors.axis, strokeWidth: 1 }}
-                axisLine={{ stroke: currentColors.axis, strokeWidth: 2 }}
-                domain={isXAxisNumeric ? getXDomain() : undefined}
-                type={isXAxisNumeric ? 'number' : 'category'}
-                interval={optimizedData.length > 100 ? 'preserveStartEnd' : 0}
-                tick={{ 
-                  fontSize: 12, 
-                  fontWeight: 500,
-                  fill: currentColors.axis
-                }}
-                tickFormatter={(value) => {
-                  if (typeof value === 'number') {
-                    return value.toLocaleString(undefined, { maximumFractionDigits: 1 });
-                  }
-                  return String(value).length > 10 ? String(value).substring(0, 10) + '...' : String(value);
-                }}
+              {/* Professional grid pattern */}
+              <pattern id="gridPattern" patternUnits="userSpaceOnUse" width="20" height="20">
+                <path d="M 20 0 L 0 0 0 20" fill="none" stroke={currentColors.grid} strokeWidth="0.5" opacity="0.3"/>
+              </pattern>
+            </defs>
+            
+            {showGrid && (
+              <CartesianGrid 
+                strokeDasharray="1 3" 
+                stroke={currentColors.grid} 
+                strokeWidth={0.8}
+                opacity={0.4}
+                horizontal={true}
+                vertical={true}
               />
-              
-              <YAxis 
-                yAxisId="left"
+            )}
+            
+          <XAxis 
+            dataKey={xAxis} 
+              stroke={currentColors.axis}
+              fontSize={13}
+              fontWeight={500}
+              tickLine={{ stroke: currentColors.axis, strokeWidth: 1 }}
+              axisLine={{ stroke: currentColors.axis, strokeWidth: 2 }}
+              domain={isXAxisNumeric ? getXDomain() : undefined}
+              type={isXAxisNumeric ? 'number' : 'category'}
+              interval={optimizedData.length > 100 ? 'preserveStartEnd' : 0}
+              tick={{ 
+                fontSize: 12, 
+                fontWeight: 500,
+                fill: currentColors.axis
+              }}
+              tickFormatter={(value) => {
+                if (typeof value === 'number') {
+                  return value.toLocaleString(undefined, { maximumFractionDigits: 1 });
+                }
+                return String(value).length > 10 ? String(value).substring(0, 10) + '...' : String(value);
+              }}
+            />
+            
+            <YAxis 
+              yAxisId="left"
+              stroke={currentColors.axis}
+              fontSize={13}
+              fontWeight={500}
+              tickLine={{ stroke: currentColors.axis, strokeWidth: 1 }}
+              axisLine={{ stroke: currentColors.axis, strokeWidth: 2 }}
+              label={yKeys[0] ? { 
+                value: yKeys[0], 
+                angle: -90, 
+                position: 'insideLeft', 
+                style: { 
+                  textAnchor: 'middle', 
+                  fontSize: 14, 
+                  fontWeight: 600,
+                  fill: currentColors.axis
+                }
+              } : undefined}
+              domain={getYDomain(0)}
+              tick={{ 
+                fontSize: 12, 
+                fontWeight: 500,
+                fill: currentColors.axis
+              }}
+              tickFormatter={(value) => value.toLocaleString(undefined, { 
+                notation: 'compact',
+                maximumFractionDigits: 2
+              })}
+            />
+            
+            {showRightAxis && (
+          <YAxis 
+                yAxisId="right"
+                orientation="right"
                 stroke={currentColors.axis}
                 fontSize={13}
                 fontWeight={500}
                 tickLine={{ stroke: currentColors.axis, strokeWidth: 1 }}
                 axisLine={{ stroke: currentColors.axis, strokeWidth: 2 }}
-                label={yKeys[0] ? { 
-                  value: yKeys[0], 
-                  angle: -90, 
-                  position: 'insideLeft', 
+                label={yKeys[1] ? { 
+                  value: yKeys[1], 
+                  angle: 90, 
+                  position: 'insideRight', 
                   style: { 
                     textAnchor: 'middle', 
                     fontSize: 14, 
@@ -629,7 +722,7 @@ export const LineChartComponent: React.FC<LineChartComponentProps> = ({
                     fill: currentColors.axis
                   }
                 } : undefined}
-                domain={getYDomain(0)}
+                domain={getYDomain(1)}
                 tick={{ 
                   fontSize: 12, 
                   fontWeight: 500,
@@ -640,303 +733,192 @@ export const LineChartComponent: React.FC<LineChartComponentProps> = ({
                   maximumFractionDigits: 2
                 })}
               />
-              
-              {showRightAxis && (
-        <YAxis 
-                  yAxisId="right"
-                  orientation="right"
-                  stroke={currentColors.axis}
-                  fontSize={13}
-                  fontWeight={500}
-                  tickLine={{ stroke: currentColors.axis, strokeWidth: 1 }}
-                  axisLine={{ stroke: currentColors.axis, strokeWidth: 2 }}
-                  label={yKeys[1] ? { 
-                    value: yKeys[1], 
-                    angle: 90, 
-                    position: 'insideRight', 
-                    style: { 
-                      textAnchor: 'middle', 
-                      fontSize: 14, 
-                      fontWeight: 600,
-                      fill: currentColors.axis
-                    }
-                  } : undefined}
-                  domain={getYDomain(1)}
-                  tick={{ 
-                    fontSize: 12, 
-                    fontWeight: 500,
-                    fill: currentColors.axis
-                  }}
-                  tickFormatter={(value) => value.toLocaleString(undefined, { 
-                    notation: 'compact',
-                    maximumFractionDigits: 2
-                  })}
-                />
+            )}
+            
+            <Tooltip content={() => null} /> {/* Disable default tooltip */}
+            <Legend 
+              wrapperStyle={{ 
+                paddingTop: '25px',
+                fontSize: '14px',
+                fontWeight: 600
+              }}
+              iconType="line"
+              formatter={(value, entry) => (
+                <span style={{ 
+                  fontSize: 13, 
+                  fontWeight: 600, 
+                  color: entry.color,
+                  textShadow: theme === 'dark' ? '0 1px 2px rgba(0,0,0,0.5)' : '0 1px 2px rgba(255,255,255,0.8)'
+                }}>
+                  {value}
+                </span>
               )}
-              
-              <Tooltip content={<CustomTooltip />} cursor={{ 
-                stroke: currentColors.lines[0], 
-                strokeWidth: 2, 
-                strokeDasharray: '5 5',
-                opacity: 0.7
-              }} />
-              
-              <Legend 
-                wrapperStyle={{ 
-                  paddingTop: '25px',
-                  fontSize: '14px',
-                  fontWeight: 600
-                }}
-                iconType="line"
-                formatter={(value, entry) => (
-                  <span style={{ 
-                    fontSize: 13, 
-                    fontWeight: 600, 
-                    color: entry.color,
-                    textShadow: theme === 'dark' ? '0 1px 2px rgba(0,0,0,0.5)' : '0 1px 2px rgba(255,255,255,0.8)'
-                  }}>
-                    {value}
-                  </span>
-                )}
-              />
-              
-              {/* Professional reference lines for statistical insights */}
+            />
+            
+            {/* Professional reference lines for statistical insights */}
+            <ReferenceLine 
+              x={dataRanges.x.mean}
+              yAxisId="left"
+              stroke={currentColors.axis} 
+              strokeDasharray="8 4" 
+              strokeWidth={1.5}
+              opacity={0.5}
+              label={{ 
+                value: "X Mean", 
+                position: "topRight",
+                style: { fontSize: 11, fontWeight: 500, fill: currentColors.axis }
+              }}
+            />
+            {dataRanges.y.map((yRange, index) => (
               <ReferenceLine 
-                x={dataRanges.x.mean}
-                yAxisId="left"
-                stroke={currentColors.axis} 
+                key={`y-mean-${index}`}
+                yAxisId={index === 1 && showRightAxis ? "right" : "left"}
+                y={yRange.mean} 
+                stroke={currentColors.lines[index % currentColors.lines.length]} 
                 strokeDasharray="8 4" 
                 strokeWidth={1.5}
-                opacity={0.5}
+                opacity={0.4}
                 label={{ 
-                  value: "X Mean", 
-                  position: "topRight",
-                  style: { fontSize: 11, fontWeight: 500, fill: currentColors.axis }
+                  value: `${yKeys[index]} Mean`, 
+                  position: "topLeft",
+                  style: { fontSize: 11, fontWeight: 500, fill: currentColors.lines[index % currentColors.lines.length] }
                 }}
               />
-              {dataRanges.y.map((yRange, index) => (
-                <ReferenceLine 
-                  key={`y-mean-${index}`}
-                  yAxisId={index === 1 && showRightAxis ? "right" : "left"}
-                  y={yRange.mean} 
-                  stroke={currentColors.lines[index % currentColors.lines.length]} 
-                  strokeDasharray="8 4" 
-                  strokeWidth={1.5}
-                  opacity={0.4}
-                  label={{ 
-                    value: `${yKeys[index]} Mean`, 
-                    position: "topLeft",
-                    style: { fontSize: 11, fontWeight: 500, fill: currentColors.lines[index % currentColors.lines.length] }
-                  }}
-                />
-              ))}
+            ))}
+            
+            {/* Enhanced lines with professional styling */}
+            {yKeys.map((key, index) => {
+              const isVisible = visibleLines.has(key);
+              const lineColor = currentColors.lines[index % currentColors.lines.length];
+              const areaColor = `url(#areaGradient-${key})`;
               
-              {/* Enhanced lines with professional styling */}
-              {yKeys.map((key, index) => {
-                const isVisible = visibleLines.has(key);
-                const lineColor = currentColors.lines[index % currentColors.lines.length];
-                const areaColor = `url(#areaGradient-${key})`;
-                
-                return (
-                  <React.Fragment key={key}>
-                    {showArea && isVisible && (
-                      <Area
-                        type={lineStyle === 'step' ? 'stepAfter' : lineStyle === 'linear' ? 'linear' : 'monotone'}
-                        dataKey={normalized ? `${key}_normalized` : key}
-                        fill={areaColor}
-                        stroke="none"
-                        yAxisId={index === 1 && showRightAxis ? "right" : "left"}
-                        animationBegin={showAnimation ? index * 300 : 0}
-                        animationDuration={showAnimation ? 1500 : 0}
-                        animationEasing="ease-out"
-                      />
-                    )}
-                    {isVisible && (
-        <Line 
-                        type={lineStyle === 'step' ? 'stepAfter' : lineStyle === 'linear' ? 'linear' : 'monotone'}
-                        dataKey={normalized ? `${key}_normalized` : key}
-                        stroke={lineColor}
-                        strokeWidth={strokeWidth}
-                        dot={showDataPoints ? <CustomDot /> : false}
-                        activeDot={{ 
-                          r: 8, 
-                          stroke: lineColor, 
-                          strokeWidth: 3, 
-                          fill: '#ffffff',
-                          filter: 'drop-shadow(0 4px 8px rgba(0, 0, 0, 0.3))',
-                          style: {
-                            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
-                          }
-                        }}
-                        name={normalized ? `${key} (normalized)` : key}
-                        yAxisId={index === 1 && showRightAxis ? "right" : "left"}
-                        connectNulls={false}
-                        animationBegin={showAnimation ? index * 300 : 0}
-                        animationDuration={showAnimation ? 1800 : 0}
-                        animationEasing="ease-out"
-                        strokeDasharray={index === 2 ? "12 6" : index === 3 ? "6 3" : undefined}
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    )}
-                  </React.Fragment>
-                );
-              })}
-              
-              {/* Enhanced brush with professional styling */}
-              {showBrush && (
-                <Brush
-                  dataKey={xAxis}
-                  height={50}
-                  stroke={currentColors.lines[0]}
-                  fill={theme === 'dark' ? '#374151' : theme === 'accent' ? '#F3F4F6' : '#F9FAFB'}
-                  onChange={handleBrushChange}
-                  startIndex={brushDomain.startIndex}
-                  endIndex={brushDomain.endIndex}
-                  tickFormatter={(value) => String(value).substring(0, 12)}
-                  travellerWidth={12}
-                />
-              )}
-            </ComposedChart>
-    </ResponsiveContainer>
-        </div>
+              return (
+                <React.Fragment key={key}>
+                  {showArea && isVisible && (
+                    <Area
+                      type={lineStyle === 'step' ? 'stepAfter' : lineStyle === 'linear' ? 'linear' : 'monotone'}
+                      dataKey={normalized ? `${key}_normalized` : key}
+                      fill={areaColor}
+                      stroke="none"
+                      yAxisId={index === 1 && showRightAxis ? "right" : "left"}
+                      animationBegin={showAnimation ? index * 300 : 0}
+                      animationDuration={showAnimation ? 1500 : 0}
+                      animationEasing="ease-out"
+                    />
+                  )}
+                  {isVisible && (
+          <Line 
+                      type={lineStyle === 'step' ? 'stepAfter' : lineStyle === 'linear' ? 'linear' : 'monotone'}
+                      dataKey={normalized ? `${key}_normalized` : key}
+                      stroke={lineColor}
+                      strokeWidth={strokeWidth}
+                      dot={showDataPoints ? <CustomDot /> : false}
+                      activeDot={{ 
+                        r: 8, 
+                        stroke: lineColor, 
+                        strokeWidth: 3, 
+                        fill: '#ffffff',
+                        filter: 'drop-shadow(0 4px 8px rgba(0, 0, 0, 0.3))',
+                        style: {
+                          transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+                        }
+                      }}
+                      name={normalized ? `${key} (normalized)` : key}
+                      yAxisId={index === 1 && showRightAxis ? "right" : "left"}
+                      connectNulls={false}
+                      animationBegin={showAnimation ? index * 300 : 0}
+                      animationDuration={showAnimation ? 1800 : 0}
+                      animationEasing="ease-out"
+                      strokeDasharray={index === 2 ? "12 6" : index === 3 ? "6 3" : undefined}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  )}
+                </React.Fragment>
+              );
+            })}
+            
+            {/* Enhanced brush with professional styling */}
+            {showBrush && (
+              <Brush
+                dataKey={xAxis}
+                height={50}
+                stroke={currentColors.lines[0]}
+                fill={theme === 'dark' ? '#374151' : theme === 'accent' ? '#F3F4F6' : '#F9FAFB'}
+                onChange={handleBrushChange}
+                startIndex={brushDomain.startIndex}
+                endIndex={brushDomain.endIndex}
+                tickFormatter={(value) => String(value).substring(0, 12)}
+                travellerWidth={12}
+              />
+            )}
+          </ComposedChart>
+      </ResponsiveContainer>
       </div>
 
-      {/* Enhanced Chart Controls - Fixed Positioning Outside Chart Area */}
-      <div 
-        ref={controlsRef}
-        className={`absolute -top-6 -right-6 transition-all duration-500 transform z-50 ${
-          controlsVisible ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-2 scale-95 pointer-events-none'
-        }`}
-        onMouseEnter={() => setControlsVisible(true)}
-        onMouseLeave={handleMouseLeave}
-      >
-        <div className={`flex flex-wrap items-center gap-2 p-4 rounded-2xl shadow-2xl border backdrop-blur-xl ${
-          theme === 'dark' 
-            ? 'bg-gray-900/95 border-gray-700 shadow-gray-900/50' 
-            : theme === 'accent'
-            ? 'bg-white/95 border-violet-200 shadow-violet-500/20'
-            : 'bg-white/95 border-gray-200 shadow-gray-500/20'
-        }`}>
-          {/* Zoom Controls */}
-          <div className="flex items-center space-x-1 px-2 py-1 rounded-lg bg-gray-100 dark:bg-gray-800">
-            <button
-              onClick={handleZoomIn}
-              className="p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-all duration-200 hover:scale-110"
-              title="Zoom In"
-            >
-              <ZoomIn className="h-4 w-4 text-gray-600 dark:text-gray-400" />
-            </button>
-            <button
-              onClick={handleZoomOut}
-              className="p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-all duration-200 hover:scale-110"
-              title="Zoom Out"
-            >
-              <ZoomOut className="h-4 w-4 text-gray-600 dark:text-gray-400" />
-            </button>
-            <button
-              onClick={handleResetZoom}
-              className="p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-all duration-200 hover:scale-110"
-              title="Reset View"
-            >
-              <RotateCcw className="h-4 w-4 text-gray-600 dark:text-gray-400" />
-            </button>
+      {/* Minimalist Floating Data Point Card */}
+      {hoveredData && (
+        <div 
+          className={`absolute z-50 pointer-events-none transition-all duration-200 ${
+            theme === 'dark' 
+              ? 'bg-gray-900/95 border-gray-700 text-white' 
+              : 'bg-white/95 border-gray-200 text-gray-900'
+          } backdrop-blur-md rounded-lg border shadow-xl px-3 py-2 min-w-40`}
+          style={{
+            left: Math.min(mousePosition.x + 15, (containerRef.current?.offsetWidth || 0) - 180),
+            top: Math.max(mousePosition.y - 60, 10),
+            transform: 'translateZ(0)' // Force hardware acceleration
+          }}
+        >
+          <div className="space-y-1">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium text-gray-500 dark:text-gray-400">{xAxis}</span>
+              <span className="text-sm font-bold">
+                {typeof hoveredData[xAxis] === 'number' 
+                  ? hoveredData[xAxis].toFixed(2) 
+                  : hoveredData[xAxis]
+                }
+              </span>
+            </div>
+            
+            {yKeys.map((key, index) => {
+              const isVisible = visibleLines.has(key);
+              if (!isVisible) return null;
+              
+              return (
+                <div key={key} className="flex items-center justify-between">
+                  <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
+                    {normalized ? `${key} (norm)` : key}
+                  </span>
+                  <span 
+                    className="text-sm font-bold"
+                    style={{ color: currentColors.lines[index % currentColors.lines.length] }}
+                  >
+                    {typeof hoveredData[normalized ? `${key}_normalized` : key] === 'number' 
+                      ? hoveredData[normalized ? `${key}_normalized` : key].toFixed(3)
+                      : hoveredData[normalized ? `${key}_normalized` : key]
+                    }
+                  </span>
+                </div>
+              );
+            })}
           </div>
-
-          {/* Display Controls */}
-          <div className="flex items-center space-x-1 px-2 py-1 rounded-lg bg-gray-100 dark:bg-gray-800">
-            <button
-              onClick={() => setShowBrush(!showBrush)}
-              className={`p-2 rounded-lg transition-all duration-200 hover:scale-110 ${
-                showBrush 
-                  ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' 
-                  : 'hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400'
-              }`}
-              title="Toggle Navigation"
-            >
-              <Move className="h-4 w-4" />
-            </button>
-            <button
-              onClick={() => setShowGrid(!showGrid)}
-              className={`p-2 rounded-lg transition-all duration-200 hover:scale-110 ${
-                showGrid 
-                  ? 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400' 
-                  : 'hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400'
-              }`}
-              title="Toggle Grid"
-            >
-              <Grid3x3 className="h-4 w-4" />
-            </button>
-            <button
-              onClick={() => setShowArea(!showArea)}
-              className={`p-2 rounded-lg transition-all duration-200 hover:scale-110 ${
-                showArea 
-                  ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400' 
-                  : 'hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400'
-              }`}
-              title="Toggle Area Fill"
-            >
-              <TrendingUp className="h-4 w-4" />
-            </button>
-            <button
-              onClick={() => setShowDataPoints(!showDataPoints)}
-              className={`p-2 rounded-lg transition-all duration-200 hover:scale-110 ${
-                showDataPoints 
-                  ? 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400' 
-                  : 'hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400'
-              }`}
-              title="Toggle Data Points"
-            >
-              <Layers className="h-4 w-4" />
-            </button>
-          </div>
-
-          {/* Style Controls */}
-          <div className="flex items-center space-x-1 px-2 py-1 rounded-lg bg-gray-100 dark:bg-gray-800">
-            <select
-              value={lineStyle}
-              onChange={(e) => setLineStyle(e.target.value as 'smooth' | 'linear' | 'step')}
-              className="text-xs px-2 py-1 rounded bg-transparent border-none outline-none text-gray-700 dark:text-gray-300"
-              title="Line Style"
-            >
-              <option value="smooth">Smooth</option>
-              <option value="linear">Linear</option>
-              <option value="step">Step</option>
-            </select>
-            <input
-              type="range"
-              min="1"
-              max="6"
-              value={strokeWidth}
-              onChange={(e) => setStrokeWidth(Number(e.target.value))}
-              className="w-12"
-              title="Line Width"
-            />
-          </div>
-
-          {/* Utility Controls */}
-          <div className="flex items-center space-x-1 px-2 py-1 rounded-lg bg-gray-100 dark:bg-gray-800">
-            <button
-              onClick={() => setEnableOptimization(!enableOptimization)}
-              className={`p-2 rounded-lg transition-all duration-200 hover:scale-110 ${
-                enableOptimization 
-                  ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-600 dark:text-yellow-400' 
-                  : 'hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400'
-              }`}
-              title={enableOptimization ? "Disable Optimization" : "Enable Optimization"}
-            >
-              {enableOptimization ? <Zap className="h-4 w-4" /> : <ZapOff className="h-4 w-4" />}
-            </button>
-            <button
-              onClick={handleExport}
-              className="p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-all duration-200 hover:scale-110"
-              title="Export Chart"
-            >
-              <Download className="h-4 w-4 text-gray-600 dark:text-gray-400" />
-            </button>
-          </div>
+          
+          {/* Small arrow pointing to data point */}
+          <div 
+            className={`absolute w-2 h-2 transform rotate-45 ${
+              theme === 'dark' ? 'bg-gray-900' : 'bg-white'
+            } border-l border-b ${
+              theme === 'dark' ? 'border-gray-700' : 'border-gray-200'
+            }`}
+            style={{
+              left: -4,
+              top: '50%',
+              marginTop: -4
+            }}
+          />
         </div>
-      </div>
+      )}
       
       {/* Enhanced legend with professional line visibility controls */}
       <div className="mt-8 space-y-4">
