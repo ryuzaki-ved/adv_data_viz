@@ -114,7 +114,7 @@ export const ChartControls: React.FC<ChartControlsProps> = ({ columns, configs, 
     onConfigsChange([...configs, newConfig]);
   };
 
-  // Generate mock orderbook and trades for Orderflow chart
+  // Generate mock orderflow data
   const generateMockOrderflowData = () => {
     const data = [];
     const basePrice = 100;
