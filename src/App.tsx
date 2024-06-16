@@ -18,40 +18,6 @@ import { ComboChartComponent } from './components/charts/ComboChartComponent';
 import { OrderflowChartComponent } from './components/charts/OrderflowChartComponent';
 import { DataFilterComponent } from './components/DataFilterComponent';
 
-// Mock orderbook and trades for Bookmap-style heatmap
-function generateMockOrderbookAndTrades() {
-  const priceStart = 100;
-  const priceStep = 0.25;
-  const priceLevels = 40;
-  const timeSteps = 120;
-  const now = Date.now();
-  const orderbook = [];
-  for (let t = 0; t < timeSteps; t++) {
-    const time = now + t * 1000;
-    const levels = [];
-    for (let p = 0; p < priceLevels; p++) {
-      const price = priceStart + p * priceStep;
-      // Simulate liquidity waves
-      const base = 50 + 40 * Math.sin((p + t / 10) / 3) + 30 * Math.cos((t + p) / 7);
-      const size = Math.max(1, Math.floor(base + 20 * Math.random()));
-      levels.push({ price, size, side: p < priceLevels / 2 ? 'bid' : 'ask' });
-    }
-    orderbook.push({ time, levels });
-  }
-  // Trades: random bubbles along the price/time grid
-  const trades = [];
-  for (let i = 0; i < 120; i++) {
-    const tIdx = Math.floor(Math.random() * timeSteps);
-    const pIdx = Math.floor(Math.random() * priceLevels);
-    const price = priceStart + pIdx * priceStep;
-    const time = now + tIdx * 1000;
-    const size = Math.floor(1 + Math.random() * 30);
-    const side = Math.random() > 0.5 ? 'buy' : 'sell';
-    trades.push({ time, price, size, side });
-  }
-  return { orderbook, trades };
-}
-
 function AppContent() {
   const [data, setData] = useState<DataPoint[]>([]);
   const [originalData, setOriginalData] = useState<DataPoint[]>([]);
@@ -292,17 +258,18 @@ function AppContent() {
       );
     }
 
-    // Handle orderflow chart rendering
+    // Handle orderflow chart rendering - NOW USES UPLOADED DATA WITH TYPE SELECTION
     if (config.chartType === 'orderflow') {
-      // Get mock data from global storage or generate new
-      const mockData = (window as any).__MOCK_ORDERFLOW_DATA__ || [];
-      
       return (
         <OrderflowChartComponent
-          data={mockData}
+          data={sortedData} // Use the actual uploaded data
+          xAxis={config.xAxis}
+          yAxis={config.yAxis}
+          normalized={config.normalized}
           width={width}
           height={height}
           theme={theme}
+          orderflowType={config.orderflowType || 'delta'} // Pass the orderflow type
         />
       );
     }
@@ -392,28 +359,6 @@ function AppContent() {
       </div>
     </div>
   );
-
-  // Add Orderflow Heatmap chart with mock data
-  const addOrderflowHeatmapChart = () => {
-    const { orderbook, trades } = generateMockOrderbookAndTrades();
-    window.__MOCK_ORDERBOOK__ = orderbook;
-    window.__MOCK_TRADES__ = trades;
-    setConfigs(configs => [
-      ...configs,
-      {
-        id: `chart-${Date.now()}`,
-        xAxis: 'price',
-        yAxis: 'size',
-        chartType: 'orderflow-heatmap',
-        normalized: false,
-        title: 'Orderflow Heatmap',
-        width: 800,
-        height: 500,
-        xOrder: 'file',
-        yOrder: 'file'
-      }
-    ]);
-  };
 
   // Handle configs change from ChartControls (including global sort)
   const handleConfigsChange = (newConfigs: any[]) => {
@@ -653,7 +598,7 @@ function AppContent() {
                             )}
                             {config.chartType === 'orderflow' && (
                               <span className="px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 text-xs rounded-full font-medium">
-                                ORDERFLOW
+                                {config.orderflowType === 'delta' ? 'DELTA' : 'HEATMAP'}
                               </span>
                             )}
                           </h3>
@@ -697,7 +642,7 @@ function AppContent() {
                               )}
                               {config.chartType === 'orderflow' && (
                                 <span className="px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 text-xs rounded-full font-medium">
-                                  ORDERFLOW
+                                  {config.orderflowType === 'delta' ? 'DELTA' : 'HEATMAP'}
                                 </span>
                               )}
                             </h3>
@@ -706,7 +651,7 @@ function AppContent() {
                                 {config.isMultiChart 
                                   ? 'Multi-Chart Combination' 
                                   : config.chartType === 'orderflow'
-                                  ? 'Professional Orderflow Analysis'
+                                  ? `${config.orderflowType === 'delta' ? 'Delta' : 'Volume Heatmap'} Orderflow Analysis`
                                   : `${config.xAxis} vs ${Array.isArray(config.yAxis) ? config.yAxis.join(', ') : config.yAxis}`
                                 }
                               </div>

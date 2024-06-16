@@ -29,6 +29,8 @@ export interface ChartConfig {
   // New multi-chart properties
   isMultiChart?: boolean;
   chartCombinations?: ChartCombination[];
+  // New orderflow property
+  orderflowType?: 'delta' | 'heatmap';
 }
 
 export interface ChartCombination {

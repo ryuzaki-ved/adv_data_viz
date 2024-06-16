@@ -114,46 +114,39 @@ export const ChartControls: React.FC<ChartControlsProps> = ({ columns, configs, 
     onConfigsChange([...configs, newConfig]);
   };
 
-  // Generate mock orderflow data
-  const generateMockOrderflowData = () => {
-    const data = [];
-    const basePrice = 100;
-    
-    for (let i = 0; i < 50; i++) {
-      const price = basePrice + (i * 0.25);
-      const bidVolume = Math.floor(Math.random() * 1000) + 100;
-      const askVolume = Math.floor(Math.random() * 1000) + 100;
-      
-      data.push({
-        price: price,
-        bidVolume: bidVolume,
-        askVolume: askVolume,
-        delta: askVolume - bidVolume,
-        time: new Date().toISOString()
-      });
-    }
-    
-    return data;
-  };
-
-  const addOrderflowChart = () => {
-    // Generate mock data for orderflow chart
-    const mockData = generateMockOrderflowData();
-    
-    // Store mock data globally for the orderflow chart to access
-    (window as any).__MOCK_ORDERFLOW_DATA__ = mockData;
-    
+  // Add Delta Orderflow Chart
+  const addDeltaOrderflowChart = () => {
     const newConfig: ChartConfig = {
       id: `chart-${Date.now()}`,
       xAxis: 'price',
-      yAxis: 'bidVolume',
+      yAxis: 'delta',
       chartType: 'orderflow',
       normalized: false,
-      title: `Orderflow Chart ${configs.length + 1}`,
+      title: `Delta Orderflow ${configs.length + 1}`,
       xOrder: 'file',
       yOrder: 'file',
-      width: 600,
-      height: 400
+      width: 800,
+      height: 400,
+      orderflowType: 'delta' // New property to specify orderflow type
+    };
+    
+    onConfigsChange([...configs, newConfig]);
+  };
+
+  // Add Heatmap Orderflow Chart
+  const addHeatmapOrderflowChart = () => {
+    const newConfig: ChartConfig = {
+      id: `chart-${Date.now()}`,
+      xAxis: 'price',
+      yAxis: 'volume',
+      chartType: 'orderflow',
+      normalized: false,
+      title: `Volume Heatmap ${configs.length + 1}`,
+      xOrder: 'file',
+      yOrder: 'file',
+      width: 800,
+      height: 400,
+      orderflowType: 'heatmap' // New property to specify orderflow type
     };
     
     onConfigsChange([...configs, newConfig]);
@@ -207,13 +200,39 @@ export const ChartControls: React.FC<ChartControlsProps> = ({ columns, configs, 
             <Layers className="h-4 w-4" />
             <span>Add Combo</span>
           </button>
-          <button
-            onClick={addOrderflowChart}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center space-x-2 ${themeClasses.orderflowButton}`}
-          >
-            <Activity className="h-4 w-4" />
-            <span>Orderflow</span>
-          </button>
+          
+          {/* Orderflow Chart Dropdown */}
+          <div className="relative group">
+            <button
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center space-x-2 ${themeClasses.orderflowButton}`}
+            >
+              <Activity className="h-4 w-4" />
+              <span>Orderflow</span>
+              <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            
+            {/* Dropdown Menu */}
+            <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+              <div className="py-2">
+                <button
+                  onClick={addDeltaOrderflowChart}
+                  className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center space-x-2"
+                >
+                  <TrendingUp className="h-4 w-4" />
+                  <span>Delta Orderflow</span>
+                </button>
+                <button
+                  onClick={addHeatmapOrderflowChart}
+                  className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center space-x-2"
+                >
+                  <Grid3x3 className="h-4 w-4" />
+                  <span>Volume Heatmap</span>
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -238,7 +257,7 @@ export const ChartControls: React.FC<ChartControlsProps> = ({ columns, configs, 
                 )}
                 {config.chartType === 'orderflow' && (
                   <span className="px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 text-xs rounded-full font-medium">
-                    ORDERFLOW
+                    {config.orderflowType === 'delta' ? 'DELTA' : 'HEATMAP'}
                   </span>
                 )}
               </div>
@@ -385,8 +404,21 @@ export const ChartControls: React.FC<ChartControlsProps> = ({ columns, configs, 
                 <div className="flex items-center space-x-2">
                   <Activity className="h-4 w-4 text-green-600 dark:text-green-400" />
                   <span className={`text-sm font-medium ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>
-                    Orderflow Chart Configuration
+                    {config.orderflowType === 'delta' ? 'Delta Orderflow' : 'Volume Heatmap'} Configuration
                   </span>
+                </div>
+
+                {/* Orderflow Type Selector */}
+                <div>
+                  <label className={`block text-xs font-medium mb-1 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>Orderflow Type</label>
+                  <select
+                    value={config.orderflowType || 'delta'}
+                    onChange={(e) => updateConfig(config.id, { orderflowType: e.target.value })}
+                    className={`w-full p-2 rounded border text-xs ${themeClasses.input} focus:ring-1 focus:ring-blue-500 focus:border-blue-500`}
+                  >
+                    <option value="delta">Delta Orderflow (Price + Delta)</option>
+                    <option value="heatmap">Volume Heatmap (Price + Bid/Ask)</option>
+                  </select>
                 </div>
 
                 <div className={`p-3 rounded-lg border-2 border-dashed ${
@@ -395,15 +427,25 @@ export const ChartControls: React.FC<ChartControlsProps> = ({ columns, configs, 
                   <div className="flex items-center space-x-2 mb-2">
                     <Activity className="h-5 w-5 text-green-600 dark:text-green-400" />
                     <span className={`font-medium ${theme === 'dark' ? 'text-green-300' : 'text-green-700'}`}>
-                      Orderflow Features:
+                      {config.orderflowType === 'delta' ? 'Delta Orderflow' : 'Volume Heatmap'} Features:
                     </span>
                   </div>
                   <ul className={`text-sm space-y-1 ${theme === 'dark' ? 'text-green-300' : 'text-green-700'}`}>
-                    <li>• Displays bid/ask volume at each price level</li>
-                    <li>• Shows order flow imbalances and delta</li>
-                    <li>• Interactive price level analysis</li>
-                    <li>• Real-time market depth visualization</li>
-                    <li>• Professional trading interface</li>
+                    {config.orderflowType === 'delta' ? (
+                      <>
+                        <li>• Horizontal price ladder with delta bars</li>
+                        <li>• Shows order flow imbalances (bid vs ask pressure)</li>
+                        <li>• Green bars = ask pressure, Red bars = bid pressure</li>
+                        <li>• Precise price level alignment</li>
+                      </>
+                    ) : (
+                      <>
+                        <li>• Horizontal volume heatmap visualization</li>
+                        <li>• Bid and ask volume intensity mapping</li>
+                        <li>• Color-coded volume levels with gradients</li>
+                        <li>• Professional trading interface</li>
+                      </>
+                    )}
                   </ul>
                 </div>
               </div>
@@ -525,7 +567,7 @@ export const ChartControlSingle: React.FC<{
           )}
           {config.chartType === 'orderflow' && (
             <span className="px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 text-xs rounded-full font-medium">
-              ORDERFLOW
+              {config.orderflowType === 'delta' ? 'DELTA' : 'HEATMAP'}
             </span>
           )}
         </div>
@@ -710,8 +752,21 @@ export const ChartControlSingle: React.FC<{
               <div className="flex items-center space-x-2">
                 <Activity className="h-4 w-4 text-green-600 dark:text-green-400" />
                 <span className={`text-lg font-medium ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>
-                  Orderflow Configuration
+                  {config.orderflowType === 'delta' ? 'Delta Orderflow' : 'Volume Heatmap'} Configuration
                 </span>
+              </div>
+
+              {/* Orderflow Type Selector */}
+              <div>
+                <label className={`block text-sm font-medium mb-2 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>Orderflow Type</label>
+                <select
+                  value={config.orderflowType || 'delta'}
+                  onChange={(e) => onUpdate({ orderflowType: e.target.value })}
+                  className={`w-full p-3 rounded-lg border text-sm ${themeClasses.input} focus:ring-2 focus:ring-blue-500 focus:border-blue-500`}
+                >
+                  <option value="delta">Delta Orderflow (Price + Delta)</option>
+                  <option value="heatmap">Volume Heatmap (Price + Bid/Ask)</option>
+                </select>
               </div>
 
               <div className={`p-4 rounded-lg border-2 border-dashed ${
@@ -720,16 +775,25 @@ export const ChartControlSingle: React.FC<{
                 <div className="flex items-center space-x-2 mb-2">
                   <Activity className="h-5 w-5 text-green-600 dark:text-green-400" />
                   <span className={`font-medium ${theme === 'dark' ? 'text-green-300' : 'text-green-700'}`}>
-                    Orderflow Features:
+                    {config.orderflowType === 'delta' ? 'Delta Orderflow' : 'Volume Heatmap'} Features:
                   </span>
                 </div>
                 <ul className={`text-sm space-y-1 ${theme === 'dark' ? 'text-green-300' : 'text-green-700'}`}>
-                  <li>• Professional order book visualization</li>
-                  <li>• Bid/Ask volume analysis at each price level</li>
-                  <li>• Order flow imbalances and delta calculations</li>
-                  <li>• Interactive price level tooltips</li>
-                  <li>• Real-time market depth representation</li>
-                  <li>• Trading-focused interface design</li>
+                  {config.orderflowType === 'delta' ? (
+                    <>
+                      <li>• Horizontal price ladder with delta bars</li>
+                      <li>• Shows order flow imbalances (bid vs ask pressure)</li>
+                      <li>• Green bars = ask pressure, Red bars = bid pressure</li>
+                      <li>• Precise price level alignment</li>
+                    </>
+                  ) : (
+                    <>
+                      <li>• Horizontal volume heatmap visualization</li>
+                      <li>• Bid and ask volume intensity mapping</li>
+                      <li>• Color-coded volume levels with gradients</li>
+                      <li>• Professional trading interface</li>
+                    </>
+                  )}
                 </ul>
               </div>
             </div>
