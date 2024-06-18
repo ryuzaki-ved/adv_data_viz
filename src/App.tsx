@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Database, Settings, TrendingUp, Plus, Maximize2, X, Info, ChevronUp, ChevronDown } from 'lucide-react';
+import { Database, Settings, TrendingUp, Plus, Maximize2, X, Info, ChevronUp, ChevronDown, Layers, Activity } from 'lucide-react';
 import { ThemeProvider, useTheme } from './contexts/ThemeContext';
 import { FileUploader } from './components/FileUploader';
 import { ThemeSelector } from './components/ThemeSelector';
@@ -146,6 +146,77 @@ function AppContent() {
       xOrder: 'file',
       yOrder: 'file'
     };
+    setConfigs([...configs, newConfig]);
+  };
+
+  // Add Combo Chart
+  const addComboChart = () => {
+    const firstCategorical = columns.find(col => col.type === 'categorical');
+    const availableNumericColumns = numericColumns.slice(0, 3); // Limit to first 3 for initial setup
+    
+    const defaultCombinations: ChartCombination[] = availableNumericColumns.map((col, index) => ({
+      id: `combo-${Date.now()}-${index}`,
+      column: col.name,
+      chartType: index === 0 ? 'bar' : 'line',
+      yAxisId: index < 2 ? 'left' : 'right',
+      color: undefined, // Will be set by the component
+      strokeWidth: 2,
+      opacity: 0.8,
+      visible: true,
+      normalized: false
+    }));
+
+    const newConfig: ChartConfig = {
+      id: `chart-${Date.now()}`,
+      xAxis: firstCategorical?.name || columns[0]?.name || '',
+      yAxis: availableNumericColumns.map(col => col.name),
+      chartType: 'bar', // This will be ignored for combo charts
+      normalized: false,
+      title: `Combo Chart ${configs.length + 1}`,
+      xOrder: 'file',
+      yOrder: 'file',
+      isMultiChart: true,
+      chartCombinations: defaultCombinations
+    };
+    
+    setConfigs([...configs, newConfig]);
+  };
+
+  // Add Delta Orderflow Chart
+  const addDeltaOrderflowChart = () => {
+    const newConfig: ChartConfig = {
+      id: `chart-${Date.now()}`,
+      xAxis: 'price',
+      yAxis: 'delta',
+      chartType: 'orderflow',
+      normalized: false,
+      title: `Delta Orderflow ${configs.length + 1}`,
+      xOrder: 'file',
+      yOrder: 'file',
+      width: 800,
+      height: 400,
+      orderflowType: 'delta'
+    };
+    
+    setConfigs([...configs, newConfig]);
+  };
+
+  // Add Heatmap Orderflow Chart
+  const addHeatmapOrderflowChart = () => {
+    const newConfig: ChartConfig = {
+      id: `chart-${Date.now()}`,
+      xAxis: 'price',
+      yAxis: 'volume',
+      chartType: 'orderflow',
+      normalized: false,
+      title: `Volume Heatmap ${configs.length + 1}`,
+      xOrder: 'file',
+      yOrder: 'file',
+      width: 800,
+      height: 400,
+      orderflowType: 'heatmap'
+    };
+    
     setConfigs([...configs, newConfig]);
   };
 
@@ -572,13 +643,56 @@ function AppContent() {
                     <Settings className="h-5 w-5" />
                     <span>Charts</span>
                   </h2>
-                  <button
-                    onClick={addNewChart}
-                    className="px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center space-x-2 bg-blue-600 text-white shadow-lg hover:bg-blue-700 transform hover:scale-105"
-                  >
-                    <Plus className="h-4 w-4" />
-                    <span>Add Chart</span>
-                  </button>
+                  <div className="flex items-center space-x-2">
+                    <button
+                      onClick={addNewChart}
+                      className="px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center space-x-2 bg-blue-600 text-white shadow-lg hover:bg-blue-700 transform hover:scale-105"
+                    >
+                      <Plus className="h-4 w-4" />
+                      <span>Add Chart</span>
+                    </button>
+                    
+                    <button
+                      onClick={addComboChart}
+                      className="px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center space-x-2 bg-purple-600 text-white shadow-lg hover:bg-purple-700 transform hover:scale-105"
+                    >
+                      <Layers className="h-4 w-4" />
+                      <span>Add Combo</span>
+                    </button>
+                    
+                    {/* Orderflow Chart Dropdown */}
+                    <div className="relative group">
+                      <button
+                        className="px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center space-x-2 bg-green-600 text-white shadow-lg hover:bg-green-700 transform hover:scale-105"
+                      >
+                        <Activity className="h-4 w-4" />
+                        <span>Orderflow</span>
+                        <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </button>
+                      
+                      {/* Dropdown Menu */}
+                      <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                        <div className="py-2">
+                          <button
+                            onClick={addDeltaOrderflowChart}
+                            className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center space-x-2"
+                          >
+                            <TrendingUp className="h-4 w-4" />
+                            <span>Delta Orderflow</span>
+                          </button>
+                          <button
+                            onClick={addHeatmapOrderflowChart}
+                            className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center space-x-2"
+                          >
+                            <Settings className="h-4 w-4" />
+                            <span>Volume Heatmap</span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
                 {/* Charts Section - Enhanced Layout */}
