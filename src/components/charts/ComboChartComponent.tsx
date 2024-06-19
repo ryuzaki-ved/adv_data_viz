@@ -75,7 +75,7 @@ export const ComboChartComponent: React.FC<ComboChartComponentProps> = ({
   const [hoveredData, setHoveredData] = useState<any>(null);
   const [mousePosition, setMousePosition] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [enableOptimization, setEnableOptimization] = useState(data.length > 1000);
-  const [showCombinationControls, setShowCombinationControls] = useState(false);
+  const [showCombinationControls, setShowCombinationControls] = useState(true);
   const chartRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   
@@ -100,6 +100,24 @@ export const ComboChartComponent: React.FC<ComboChartComponentProps> = ({
   
   const currentPalette = colorPalettes[theme];
 
+  // Initialize combinations if empty
+  React.useEffect(() => {
+    if (combinations.length === 0 && availableColumns.length > 0) {
+      const defaultCombinations: ChartCombination[] = availableColumns.slice(0, 3).map((col, index) => ({
+        id: `combo-${Date.now()}-${index}`,
+        column: col,
+        chartType: index === 0 ? 'bar' : 'line',
+        yAxisId: index < 2 ? 'left' : 'right',
+        color: currentPalette[index % currentPalette.length],
+        strokeWidth: 2,
+        opacity: 0.8,
+        visible: true,
+        normalized: false
+      }));
+      onCombinationsChange(defaultCombinations);
+    }
+  }, [combinations.length, availableColumns, currentPalette, onCombinationsChange]);
+
   // Intelligent data optimization
   const optimizedData = useMemo(() => {
     if (!enableOptimization || data.length <= 1000) return data;
@@ -119,26 +137,31 @@ export const ComboChartComponent: React.FC<ComboChartComponentProps> = ({
     return sampled.slice(0, sampleSize);
   }, [data, enableOptimization]);
 
-  // Calculate data ranges
+  // Enhanced data ranges calculation with proper normalization support
   const dataRanges = useMemo(() => {
     const xValues = optimizedData.map(d => {
       const val = d[xAxis];
       return typeof val === 'number' ? val : parseFloat(String(val));
     }).filter(v => !isNaN(v));
 
-    const leftAxisColumns = combinations.filter(c => c.yAxisId === 'left').map(c => c.column);
-    const rightAxisColumns = combinations.filter(c => c.yAxisId === 'right').map(c => c.column);
+    // Separate combinations by axis and normalization status
+    const leftAxisCombinations = combinations.filter(c => c.yAxisId === 'left' && c.visible);
+    const rightAxisCombinations = combinations.filter(c => c.yAxisId === 'right' && c.visible);
 
-    const leftYValues = leftAxisColumns.flatMap(col => 
+    // Calculate ranges for left axis (considering individual normalization)
+    const leftYValues = leftAxisCombinations.flatMap(combo => 
       optimizedData.map(d => {
-        const val = normalized ? d[`${col}_normalized`] : d[col];
+        // Use individual combination's normalization setting, not global
+        const val = combo.normalized ? d[`${combo.column}_normalized`] : d[combo.column];
         return typeof val === 'number' ? val : parseFloat(String(val));
       }).filter(v => !isNaN(v))
     );
 
-    const rightYValues = rightAxisColumns.flatMap(col => 
+    // Calculate ranges for right axis (considering individual normalization)
+    const rightYValues = rightAxisCombinations.flatMap(combo => 
       optimizedData.map(d => {
-        const val = normalized ? d[`${col}_normalized`] : d[col];
+        // Use individual combination's normalization setting, not global
+        const val = combo.normalized ? d[`${combo.column}_normalized`] : d[combo.column];
         return typeof val === 'number' ? val : parseFloat(String(val));
       }).filter(v => !isNaN(v))
     );
@@ -158,9 +181,42 @@ export const ComboChartComponent: React.FC<ComboChartComponentProps> = ({
       max: Math.max(...rightYValues)
     } : { min: 0, max: 100 };
 
+    // Smart padding calculation
     const xPadding = (xRange.max - xRange.min) * 0.05;
     const leftYPadding = (leftYRange.max - leftYRange.min) * 0.1;
     const rightYPadding = (rightYRange.max - rightYRange.min) * 0.1;
+
+    // Special handling for normalized data (should be 0-1 range)
+    const hasNormalizedLeft = leftAxisCombinations.some(c => c.normalized);
+    const hasNormalizedRight = rightAxisCombinations.some(c => c.normalized);
+    const hasRegularLeft = leftAxisCombinations.some(c => !c.normalized);
+    const hasRegularRight = rightAxisCombinations.some(c => !c.normalized);
+
+    // Adjust ranges for mixed normalized/regular data
+    let finalLeftRange = leftYRange;
+    let finalRightRange = rightYRange;
+
+    if (hasNormalizedLeft && hasRegularLeft) {
+      // Mixed data on left axis - extend range to accommodate both
+      finalLeftRange = {
+        min: Math.min(leftYRange.min, 0),
+        max: Math.max(leftYRange.max, 1)
+      };
+    } else if (hasNormalizedLeft && !hasRegularLeft) {
+      // Only normalized data on left axis
+      finalLeftRange = { min: 0, max: 1 };
+    }
+
+    if (hasNormalizedRight && hasRegularRight) {
+      // Mixed data on right axis - extend range to accommodate both
+      finalRightRange = {
+        min: Math.min(rightYRange.min, 0),
+        max: Math.max(rightYRange.max, 1)
+      };
+    } else if (hasNormalizedRight && !hasRegularRight) {
+      // Only normalized data on right axis
+      finalRightRange = { min: 0, max: 1 };
+    }
 
     return {
       x: {
@@ -170,19 +226,19 @@ export const ComboChartComponent: React.FC<ComboChartComponentProps> = ({
         dataMax: xRange.max
       },
       leftY: {
-        min: leftYRange.min - leftYPadding,
-        max: leftYRange.max + leftYPadding,
-        dataMin: leftYRange.min,
-        dataMax: leftYRange.max
+        min: finalLeftRange.min - (hasNormalizedLeft && !hasRegularLeft ? 0 : leftYPadding),
+        max: finalLeftRange.max + (hasNormalizedLeft && !hasRegularLeft ? 0 : leftYPadding),
+        dataMin: finalLeftRange.min,
+        dataMax: finalLeftRange.max
       },
       rightY: {
-        min: rightYRange.min - rightYPadding,
-        max: rightYRange.max + rightYPadding,
-        dataMin: rightYRange.min,
-        dataMax: rightYRange.max
+        min: finalRightRange.min - (hasNormalizedRight && !hasRegularRight ? 0 : rightYPadding),
+        max: finalRightRange.max + (hasNormalizedRight && !hasRegularRight ? 0 : rightYPadding),
+        dataMin: finalRightRange.min,
+        dataMax: finalRightRange.max
       }
     };
-  }, [optimizedData, xAxis, combinations, normalized]);
+  }, [optimizedData, xAxis, combinations]);
 
   // Domain calculations
   const getXDomain = useCallback(() => {
@@ -342,7 +398,63 @@ export const ComboChartComponent: React.FC<ComboChartComponentProps> = ({
   };
 
   const isXAxisNumeric = typeof optimizedData[0]?.[xAxis] === 'number';
-  const hasRightAxis = combinations.some(c => c.yAxisId === 'right');
+  const hasRightAxis = combinations.some(c => c.yAxisId === 'right' && c.visible);
+
+  // Custom tooltip with proper normalization display
+  const CustomTooltip = ({ active, payload, label }: any) => {
+    if (active && payload && payload.length) {
+      return (
+        <div className={`p-4 rounded-xl shadow-2xl border backdrop-blur-sm transition-all duration-200 ${
+          theme === 'dark' 
+            ? 'bg-gray-900/95 border-gray-700 text-white' 
+            : 'bg-white/95 border-gray-200 text-gray-900'
+        }`}>
+          <div className="flex items-center space-x-2 mb-3">
+            <TrendingUp className="h-4 w-4 text-blue-500" />
+            <p className="font-semibold text-sm">{xAxis}: {label}</p>
+          </div>
+          <div className="space-y-2">
+            {payload.map((entry: any, index: number) => {
+              // Find the corresponding combination to check normalization
+              const combo = combinations.find(c => {
+                const dataKey = c.normalized ? `${c.column}_normalized` : c.column;
+                return entry.dataKey === dataKey;
+              });
+              
+              const isNormalized = combo?.normalized || false;
+              const displayValue = isNormalized && typeof entry.value === 'number' 
+                ? `${(entry.value * 100).toFixed(1)}%` // Show normalized as percentage
+                : typeof entry.value === 'number' 
+                  ? entry.value.toLocaleString(undefined, {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2
+                    })
+                  : entry.value;
+
+              return (
+                <div key={index} className="flex justify-between items-center space-x-4">
+                  <div className="flex items-center space-x-2">
+                    <div 
+                      className="w-3 h-3 rounded-full"
+                      style={{ backgroundColor: entry.color }}
+                    />
+                    <span className="text-sm font-medium">
+                      {combo?.column || entry.dataKey}
+                      {isNormalized && <span className="text-xs text-gray-500 ml-1">(norm)</span>}
+                    </span>
+                  </div>
+                  <span className="text-sm font-bold">
+                    {displayValue}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      );
+    }
+    return null;
+  };
 
   return (
     <div className="relative w-full" ref={containerRef}>
@@ -554,7 +666,7 @@ export const ComboChartComponent: React.FC<ComboChartComponentProps> = ({
                       onChange={(e) => updateCombination(combo.id, { normalized: e.target.checked })}
                       className="rounded"
                     />
-                    <span className="text-gray-700 dark:text-gray-300">Normalized</span>
+                    <span className="text-gray-700 dark:text-gray-300">Normalized (0-1)</span>
                   </label>
                   
                   <div className="flex items-center space-x-2">
@@ -590,7 +702,7 @@ export const ComboChartComponent: React.FC<ComboChartComponentProps> = ({
             <defs>
               {/* Gradients for area charts */}
               {combinations.map((combo, index) => (
-                combo.chartType === 'area' && (
+                combo.chartType === 'area' && combo.visible && (
                   <linearGradient key={`areaGradient-${combo.id}`} id={`areaGradient-${combo.id}`} x1="0" y1="0" x2="0" y2="1">
                     <stop offset="0%" stopColor={combo.color || currentPalette[index % currentPalette.length]} stopOpacity="0.3" />
                     <stop offset="100%" stopColor={combo.color || currentPalette[index % currentPalette.length]} stopOpacity="0.05" />
@@ -628,7 +740,22 @@ export const ComboChartComponent: React.FC<ComboChartComponentProps> = ({
               axisLine={{ stroke: theme === 'dark' ? '#4B5563' : '#D1D5DB', strokeWidth: 1 }}
               domain={getYDomain('left')}
               tick={{ fontSize: 11, fontWeight: 500 }}
-              tickFormatter={(value) => value.toLocaleString()}
+              tickFormatter={(value) => {
+                // Check if this axis has normalized data
+                const hasNormalizedLeft = combinations.some(c => c.yAxisId === 'left' && c.normalized && c.visible);
+                const hasRegularLeft = combinations.some(c => c.yAxisId === 'left' && !c.normalized && c.visible);
+                
+                if (hasNormalizedLeft && !hasRegularLeft) {
+                  // Only normalized data - show as percentage
+                  return `${(value * 100).toFixed(0)}%`;
+                } else if (hasNormalizedLeft && hasRegularLeft) {
+                  // Mixed data - show both formats
+                  if (value >= 0 && value <= 1) {
+                    return `${(value * 100).toFixed(0)}%`;
+                  }
+                }
+                return value.toLocaleString();
+              }}
             />
             
             {hasRightAxis && (
@@ -641,11 +768,26 @@ export const ComboChartComponent: React.FC<ComboChartComponentProps> = ({
                 axisLine={{ stroke: theme === 'dark' ? '#4B5563' : '#D1D5DB', strokeWidth: 1 }}
                 domain={getYDomain('right')}
                 tick={{ fontSize: 11, fontWeight: 500 }}
-                tickFormatter={(value) => value.toLocaleString()}
+                tickFormatter={(value) => {
+                  // Check if this axis has normalized data
+                  const hasNormalizedRight = combinations.some(c => c.yAxisId === 'right' && c.normalized && c.visible);
+                  const hasRegularRight = combinations.some(c => c.yAxisId === 'right' && !c.normalized && c.visible);
+                  
+                  if (hasNormalizedRight && !hasRegularRight) {
+                    // Only normalized data - show as percentage
+                    return `${(value * 100).toFixed(0)}%`;
+                  } else if (hasNormalizedRight && hasRegularRight) {
+                    // Mixed data - show both formats
+                    if (value >= 0 && value <= 1) {
+                      return `${(value * 100).toFixed(0)}%`;
+                    }
+                  }
+                  return value.toLocaleString();
+                }}
               />
             )}
             
-            <Tooltip content={() => null} />
+            <Tooltip content={<CustomTooltip />} />
             <Legend 
               wrapperStyle={{ paddingTop: '20px' }}
               formatter={(value, entry) => (
@@ -714,15 +856,10 @@ export const ComboChartComponent: React.FC<ComboChartComponentProps> = ({
                   );
                   
                 case 'scatter':
-                  const scatterData = optimizedData.map(item => ({
-                    x: item[xAxis],
-                    y: item[dataKey]
-                  })).filter(item => !isNaN(Number(item.x)) && !isNaN(Number(item.y)));
-                  
                   return (
                     <Scatter
                       key={combo.id}
-                      data={scatterData}
+                      dataKey={dataKey}
                       fill={color}
                       fillOpacity={opacity}
                       yAxisId={combo.yAxisId}
@@ -779,22 +916,27 @@ export const ComboChartComponent: React.FC<ComboChartComponentProps> = ({
             
             {combinations.filter(c => c.visible).map((combo, index) => {
               const dataKey = combo.normalized ? `${combo.column}_normalized` : combo.column;
+              const value = hoveredData[dataKey];
+              const displayValue = combo.normalized && typeof value === 'number' 
+                ? `${(value * 100).toFixed(1)}%`
+                : typeof value === 'number' 
+                  ? value.toFixed(3)
+                  : value;
+              
               return (
                 <div key={combo.id} className="flex items-center justify-between">
                   <div className="flex items-center space-x-2">
                     {getChartTypeIcon(combo.chartType)}
                     <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
-                      {combo.normalized ? `${combo.column} (norm)` : combo.column}
+                      {combo.column}
+                      {combo.normalized && <span className="text-xs text-gray-400 ml-1">(norm)</span>}
                     </span>
                   </div>
                   <span 
                     className="text-sm font-bold"
                     style={{ color: combo.color || currentPalette[index % currentPalette.length] }}
                   >
-                    {typeof hoveredData[dataKey] === 'number' 
-                      ? hoveredData[dataKey].toFixed(3)
-                      : hoveredData[dataKey]
-                    }
+                    {displayValue}
                   </span>
                 </div>
               );
@@ -826,7 +968,8 @@ export const ComboChartComponent: React.FC<ComboChartComponentProps> = ({
               style={{ backgroundColor: combo.color || currentPalette[idx % currentPalette.length] }}
             />
             <span className="font-medium text-gray-900 dark:text-white">
-              {combo.normalized ? `${combo.column} (normalized)` : combo.column}
+              {combo.column}
+              {combo.normalized && <span className="text-xs text-gray-500 ml-1">(norm)</span>}
             </span>
             <span className="text-gray-500 dark:text-gray-400">
               ({combo.yAxisId})
