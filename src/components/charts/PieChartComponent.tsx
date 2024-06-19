@@ -248,7 +248,7 @@ export const PieChartComponent: React.FC<PieChartComponentProps> = ({
     );
   };
 
-  // Custom label function
+  // Custom label function with smart positioning
   const renderCustomLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, name }: any) => {
     if (percent < 0.05) return null; // Hide labels for slices smaller than 5%
     
@@ -257,6 +257,10 @@ export const PieChartComponent: React.FC<PieChartComponentProps> = ({
     const x = cx + radius * Math.cos(-midAngle * RADIAN);
     const y = cy + radius * Math.sin(-midAngle * RADIAN);
 
+    // Smart label positioning to avoid overlap
+    const labelText = `${(percent * 100).toFixed(0)}%`;
+    const isLongLabel = name && name.length > 8;
+    
     return (
       <text 
         x={x} 
@@ -265,9 +269,12 @@ export const PieChartComponent: React.FC<PieChartComponentProps> = ({
         textAnchor={x > cx ? 'start' : 'end'} 
         dominantBaseline="central"
         className="text-xs font-semibold"
-        style={{ textShadow: '1px 1px 2px rgba(0,0,0,0.5)' }}
+        style={{ 
+          textShadow: '1px 1px 2px rgba(0,0,0,0.5)',
+          fontSize: isLongLabel ? '10px' : '12px'
+        }}
       >
-        {`${(percent * 100).toFixed(0)}%`}
+        {labelText}
       </text>
     );
   };
@@ -373,11 +380,13 @@ export const PieChartComponent: React.FC<PieChartComponentProps> = ({
                 </div>
               </div>
               
-              {/* Interactive Legend */}
+              {/* Interactive Legend with smart wrapping */}
               <div className="mt-4 max-w-xs">
                 <div className="grid grid-cols-1 gap-1 max-h-40 overflow-y-auto">
                   {processedData[seriesIndex].data.map((entry, index) => {
                     const isHidden = hiddenSlices.has(`${series.key}-${entry.name}`);
+                    const displayName = entry.name.length > 15 ? `${entry.name.substring(0, 15)}...` : entry.name;
+                    
                     return (
                       <button
                         key={entry.name}
@@ -387,6 +396,7 @@ export const PieChartComponent: React.FC<PieChartComponentProps> = ({
                             ? 'opacity-50 bg-gray-100 dark:bg-gray-800' 
                             : 'hover:bg-gray-100 dark:hover:bg-gray-700'
                         }`}
+                        title={entry.name} // Show full name on hover
                       >
                         <div className="flex items-center space-x-2 min-w-0">
                           <div 
@@ -394,7 +404,7 @@ export const PieChartComponent: React.FC<PieChartComponentProps> = ({
                             style={{ backgroundColor: currentPalette[index % currentPalette.length] }}
                           />
                           <span className="truncate font-medium text-gray-900 dark:text-white">
-                            {entry.name}
+                            {displayName}
                           </span>
                         </div>
                         <div className="flex items-center space-x-1 flex-shrink-0">

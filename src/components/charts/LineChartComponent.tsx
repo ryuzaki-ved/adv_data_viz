@@ -478,7 +478,71 @@ export const LineChartComponent: React.FC<LineChartComponentProps> = ({
     );
   };
 
-  const isXAxisNumeric = typeof optimizedData[0]?.[xAxis] === 'number';
+  // Smart X-axis label calculation
+  const getXAxisProps = useMemo(() => {
+    const isXAxisNumeric = typeof optimizedData[0]?.[xAxis] === 'number';
+    const dataLength = optimizedData.length;
+    
+    // Calculate optimal label spacing to prevent overlap
+    let interval = 0;
+    let angle = 0;
+    let textAnchor = 'middle';
+    let height = 12;
+    
+    if (dataLength > 50) {
+      // For many data points, use angled labels
+      interval = Math.ceil(dataLength / 20); // Show every nth label
+      angle = -45;
+      textAnchor = 'end';
+      height = 16;
+    } else if (dataLength > 20) {
+      // For moderate data points, use vertical labels
+      interval = Math.ceil(dataLength / 15);
+      angle = -90;
+      textAnchor = 'middle';
+      height = 20;
+    } else if (dataLength > 10) {
+      // For some data points, use slight angle
+      interval = Math.ceil(dataLength / 10);
+      angle = -30;
+      textAnchor = 'end';
+      height = 14;
+    } else {
+      // For few data points, keep horizontal
+      interval = 0; // Show all labels
+      angle = 0;
+      textAnchor = 'middle';
+      height = 12;
+    }
+
+    // Custom tick formatter for better readability
+    const tickFormatter = (value: any) => {
+      if (typeof value === 'string') {
+        // Truncate long strings
+        return value.length > 12 ? `${value.substring(0, 12)}...` : value;
+      } else if (typeof value === 'number') {
+        // Format numbers appropriately
+        if (Math.abs(value) >= 1000000) {
+          return `${(value / 1000000).toFixed(1)}M`;
+        } else if (Math.abs(value) >= 1000) {
+          return `${(value / 1000).toFixed(1)}K`;
+        } else {
+          return value.toFixed(value % 1 === 0 ? 0 : 1);
+        }
+      }
+      return String(value);
+    };
+
+    return {
+      interval: interval === 0 ? 0 : interval,
+      angle,
+      textAnchor,
+      height,
+      tickFormatter,
+      domain: isXAxisNumeric ? getXDomain() : undefined,
+      type: isXAxisNumeric ? 'number' : 'category'
+    };
+  }, [optimizedData, xAxis, getXDomain]);
 
   return (
     <div className="relative w-full" ref={containerRef}>
@@ -612,13 +676,18 @@ export const LineChartComponent: React.FC<LineChartComponentProps> = ({
         </div>
       </div>
 
-      {/* Chart Area - Fixed size to prevent resizing */}
+      {/* Chart Area - Fixed size to prevent resizing with dynamic bottom margin */}
       <div className="w-full" style={{ height: height }}>
         <ResponsiveContainer width="100%" height="100%">
           <ComposedChart 
             ref={chartRef}
             data={optimizedData} 
-            margin={{ top: 30, right: 60, left: 30, bottom: showBrush ? 100 : 30 }}
+            margin={{ 
+              top: 30, 
+              right: 60, 
+              left: 30, 
+              bottom: showBrush ? 100 + getXAxisProps.height : 30 + getXAxisProps.height 
+            }}
             onMouseMove={handleMouseMove}
             onMouseLeave={handleMouseLeave}
           >
@@ -649,27 +718,25 @@ export const LineChartComponent: React.FC<LineChartComponentProps> = ({
               />
             )}
             
-          <XAxis 
-            dataKey={xAxis} 
+            <XAxis 
+              dataKey={xAxis} 
               stroke={currentColors.axis}
               fontSize={13}
               fontWeight={500}
               tickLine={{ stroke: currentColors.axis, strokeWidth: 1 }}
               axisLine={{ stroke: currentColors.axis, strokeWidth: 2 }}
-              domain={isXAxisNumeric ? getXDomain() : undefined}
-              type={isXAxisNumeric ? 'number' : 'category'}
-              interval={optimizedData.length > 100 ? 'preserveStartEnd' : 0}
+              domain={getXAxisProps.domain}
+              type={getXAxisProps.type}
+              interval={getXAxisProps.interval}
+              angle={getXAxisProps.angle}
+              textAnchor={getXAxisProps.textAnchor}
+              height={getXAxisProps.height}
               tick={{ 
                 fontSize: 12, 
                 fontWeight: 500,
                 fill: currentColors.axis
               }}
-              tickFormatter={(value) => {
-                if (typeof value === 'number') {
-                  return value.toLocaleString(undefined, { maximumFractionDigits: 1 });
-                }
-                return String(value).length > 10 ? String(value).substring(0, 10) + '...' : String(value);
-              }}
+              tickFormatter={getXAxisProps.tickFormatter}
             />
             
             <YAxis 
@@ -703,7 +770,7 @@ export const LineChartComponent: React.FC<LineChartComponentProps> = ({
             />
             
             {showRightAxis && (
-          <YAxis 
+              <YAxis 
                 yAxisId="right"
                 orientation="right"
                 stroke={currentColors.axis}
@@ -807,7 +874,7 @@ export const LineChartComponent: React.FC<LineChartComponentProps> = ({
                     />
                   )}
                   {isVisible && (
-          <Line 
+                    <Line 
                       type={lineStyle === 'step' ? 'stepAfter' : lineStyle === 'linear' ? 'linear' : 'monotone'}
                       dataKey={normalized ? `${key}_normalized` : key}
                       stroke={lineColor}
@@ -853,7 +920,7 @@ export const LineChartComponent: React.FC<LineChartComponentProps> = ({
               />
             )}
           </ComposedChart>
-      </ResponsiveContainer>
+        </ResponsiveContainer>
       </div>
 
       {/* Minimalist Floating Data Point Card */}

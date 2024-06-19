@@ -360,6 +360,71 @@ export const ScatterChartComponent: React.FC<ScatterChartComponentProps> = ({
     );
   };
 
+  // Smart X-axis label calculation
+  const getXAxisProps = useMemo(() => {
+    const dataLength = optimizedData.length;
+    
+    // Calculate optimal label spacing to prevent overlap
+    let interval = 0;
+    let angle = 0;
+    let textAnchor = 'middle';
+    let height = 12;
+    
+    if (dataLength > 50) {
+      // For many data points, use angled labels
+      interval = Math.ceil(dataLength / 20); // Show every nth label
+      angle = -45;
+      textAnchor = 'end';
+      height = 16;
+    } else if (dataLength > 20) {
+      // For moderate data points, use vertical labels
+      interval = Math.ceil(dataLength / 15);
+      angle = -90;
+      textAnchor = 'middle';
+      height = 20;
+    } else if (dataLength > 10) {
+      // For some data points, use slight angle
+      interval = Math.ceil(dataLength / 10);
+      angle = -30;
+      textAnchor = 'end';
+      height = 14;
+    } else {
+      // For few data points, keep horizontal
+      interval = 0; // Show all labels
+      angle = 0;
+      textAnchor = 'middle';
+      height = 12;
+    }
+
+    // Custom tick formatter for better readability
+    const tickFormatter = (value: any) => {
+      if (typeof value === 'string') {
+        // Truncate long strings
+        return value.length > 12 ? `${value.substring(0, 12)}...` : value;
+      } else if (typeof value === 'number') {
+        // Format numbers appropriately
+        if (Math.abs(value) >= 1000000) {
+          return `${(value / 1000000).toFixed(1)}M`;
+        } else if (Math.abs(value) >= 1000) {
+          return `${(value / 1000).toFixed(1)}K`;
+        } else {
+          return value.toFixed(value % 1 === 0 ? 0 : 1);
+        }
+      }
+      return String(value);
+    };
+
+    return {
+      interval: interval === 0 ? 0 : interval,
+      angle,
+      textAnchor,
+      height,
+      tickFormatter,
+      domain: getXDomain(),
+      type: 'number'
+    };
+  }, [optimizedData, getXDomain]);
+
   return (
     <div className="relative w-full" ref={containerRef}>
       {/* Chart Controls - Moved outside chart area */}
@@ -437,12 +502,17 @@ export const ScatterChartComponent: React.FC<ScatterChartComponentProps> = ({
         </div>
       </div>
 
-      {/* Chart Area - Fixed size to prevent resizing */}
+      {/* Chart Area - Fixed size to prevent resizing with dynamic bottom margin */}
       <div className="w-full" style={{ height: height }}>
         <ResponsiveContainer width="100%" height="100%">
           <ScatterChart 
             ref={chartRef}
-            margin={{ top: 20, right: 50, left: 20, bottom: 20 }}
+            margin={{ 
+              top: 20, 
+              right: 50, 
+              left: 20, 
+              bottom: 20 + getXAxisProps.height 
+            }}
           >
             {showGrid && (
               <CartesianGrid 
@@ -453,17 +523,24 @@ export const ScatterChartComponent: React.FC<ScatterChartComponentProps> = ({
               />
             )}
             
-          <XAxis 
-            type="number" 
-            dataKey="x" 
-            name={xAxis}
+            <XAxis 
+              type="number" 
+              dataKey="x" 
+              name={xAxis}
               stroke={theme === 'dark' ? '#9CA3AF' : '#6B7280'}
               fontSize={12}
               tickLine={false}
               axisLine={{ stroke: theme === 'dark' ? '#4B5563' : '#D1D5DB', strokeWidth: 1 }}
-              domain={getXDomain()}
-              tick={{ fontSize: 11, fontWeight: 500 }}
-              tickFormatter={(value) => value.toLocaleString()}
+              domain={getXAxisProps.domain}
+              angle={getXAxisProps.angle}
+              textAnchor={getXAxisProps.textAnchor}
+              height={getXAxisProps.height}
+              tick={{ 
+                fontSize: 11, 
+                fontWeight: 500,
+                fill: theme === 'dark' ? '#9CA3AF' : '#6B7280'
+              }}
+              tickFormatter={getXAxisProps.tickFormatter}
             />
             
             <YAxis 
@@ -472,7 +549,7 @@ export const ScatterChartComponent: React.FC<ScatterChartComponentProps> = ({
               dataKey="y" 
               stroke={theme === 'dark' ? '#9CA3AF' : '#6B7280'}
               fontSize={12}
-            tickLine={false}
+              tickLine={false}
               axisLine={{ stroke: theme === 'dark' ? '#4B5563' : '#D1D5DB', strokeWidth: 1 }}
               label={yKeys[0] ? { 
                 value: yKeys[0], 
@@ -486,14 +563,14 @@ export const ScatterChartComponent: React.FC<ScatterChartComponentProps> = ({
             />
             
             {showRightAxis && (
-          <YAxis 
+              <YAxis 
                 yAxisId="right"
                 orientation="right"
-            type="number" 
-            dataKey="y" 
+                type="number" 
+                dataKey="y" 
                 stroke={theme === 'dark' ? '#9CA3AF' : '#6B7280'}
                 fontSize={12}
-            tickLine={false}
+                tickLine={false}
                 axisLine={{ stroke: theme === 'dark' ? '#4B5563' : '#D1D5DB', strokeWidth: 1 }}
                 label={yKeys[1] ? { 
                   value: yKeys[1], 
@@ -541,7 +618,7 @@ export const ScatterChartComponent: React.FC<ScatterChartComponentProps> = ({
             
             {/* Enhanced scatter plots */}
             {yKeys.map((key, index) => (
-          <Scatter 
+              <Scatter 
                 key={key}
                 data={scatterDataArr[index]} 
                 fill={currentColors.primary[index % currentColors.primary.length]}
@@ -552,8 +629,8 @@ export const ScatterChartComponent: React.FC<ScatterChartComponentProps> = ({
                 animationDuration={showAnimation ? 1000 : 0}
               />
             ))}
-        </ScatterChart>
-      </ResponsiveContainer>
+          </ScatterChart>
+        </ResponsiveContainer>
       </div>
 
       {/* Minimalist Floating Data Point Card */}
