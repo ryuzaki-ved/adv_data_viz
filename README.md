@@ -71,10 +71,9 @@ Before you begin, ensure you have the following software installed on your syste
 1.  **Clone the repository**:
     If you have Git installed, open your terminal or command prompt and run:
     ```bash
-    git clone <repository_url>
+    git clone https://github.com/ryuzaki-ved/adv_data_viz
     cd csv-data-visualization-platform
     ```
-    (Replace `<repository_url>` with the actual URL of your project's repository.)
 
     If you downloaded the project as a ZIP file, extract it to your desired directory and navigate into the project folder.
 
